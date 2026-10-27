@@ -98,21 +98,46 @@ GhostTrace/
 │   ├── components/
 │   │   ├── Header.jsx             # Status, model selector, CRT and EVP audio toggles
 │   │   ├── ArcheologyBar.jsx      # Archive selector, file upload, folder scan, terminal import & paste
-│   │   ├── EvidencePanel.jsx      # The Digital Crypt: syntax, TODOs, panics, redactions
-│   │   └── ManifestationPanel.jsx # The Séance Chamber: persona selector, story streaming & citations
+│   │   ├── EvidencePanel.jsx      # The Digital Crypt: syntax, TODOs, panics, redactions, haunted terminal tab
+│   │   └── ManifestationPanel.jsx # The Séance Chamber: persona selector, story streaming & 3-tier epistemic display
 │   ├── data/
 │   │   ├── personas.js            # Spectral persona prompts and system instructions
 │   │   └── sampleArchives.js      # Curated artifacts (vault_cipher.rs, incident_0411.log, etc.)
 │   ├── utils/
 │   │   ├── audio.js               # Web Audio API ambient drone & keystroke synthesizer
 │   │   ├── forensics.js           # Archaeological parser for TODOs, panics, and timestamps
+│   │   ├── manifestationParser.js # 3-Tier epistemic parser & baseline ground truth formatter
+│   │   ├── memoryExplorer.js      # Bounded recursive multi-file parser & binary filter
 │   │   ├── ollama.js              # Ollama proxy client, token streamer & fallback simulator
-│   │   └── redactor.js            # Client-side privacy shield redacting secrets & keys
-│   ├── App.jsx                    # Core application orchestrator
+│   │   ├── redactor.js            # Client-side privacy shield redacting secrets, paths & keys
+│   │   └── terminalForensics.js   # Inert text-only terminal history & failure loop analyzer
+│   ├── App.jsx                    # Core application orchestrator & dossier exporter
 │   └── index.css                  # Cyber-gothic CRT design system
+├── tests/                         # Node.js native automated test suite (14 tests)
+│   ├── evidence_vs_imagination.test.js
+│   ├── haunted_terminal.test.js
+│   ├── memory_explorer.test.js
+│   └── redactor.test.js
 ├── vite.config.js                 # Vite dev server with /ollama reverse proxy
 └── package.json
 ```
+
+---
+
+## 🧪 Automated Test Suite
+
+GhostTrace includes a complete native automated test suite with zero extra test-runner dependencies:
+
+```bash
+npm test
+```
+
+Verifies all 14 test cases across the core pillars:
+- **Evidence vs. Imagination:** Validates epistemic tier separation, fallback handling, multi-file citation regex, and citation boundary clamping.
+- **Haunted Terminal:** Validates inert text parsing without shell execution, detection of dangerous commands (`rm -rf`, `drop database`, `dd`, `git reset --hard`), failure exit codes (`137`, `139`), and command repetition loops.
+- **Digital Memory Explorer:** Validates file-count limits (max 30), total size bounds, binary file rejection (null-byte inspection), and automated pre-inference privacy redaction.
+- **Redaction Shield:** Validates client-side sanitization of API keys, passwords, Bearer tokens, and Windows/Unix file paths.
+
 
 ---
 

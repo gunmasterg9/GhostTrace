@@ -54,3 +54,29 @@ npm run dev
   assert.ok(loop);
   assert.equal(loop.count, 3);
 });
+
+test('Haunted Terminal - detects database drops, git force pushes, and disk overwrites', () => {
+  const terminalLog = `
+$ drop database production_db
+$ git push origin main --force
+$ git reset --hard HEAD~5
+$ dd if=/dev/zero of=/dev/sda bs=1M
+$ chmod -R 777 /app
+$ sudo su
+$ exit 139
+  `.trim();
+
+  const forensics = analyzeTerminalHistory(terminalLog, 'incident_terminal.log');
+  assert.equal(forensics.isTerminal, true);
+
+  const labels = forensics.dangerousCommands.map((d) => d.label);
+  assert.ok(labels.includes('Database Purge'));
+  assert.ok(labels.includes('Destructive Force Push'));
+  assert.ok(labels.includes('Unrecoverable Git History Discard'));
+  assert.ok(labels.includes('Raw Disk Write (dd)'));
+  assert.ok(labels.includes('Insecure World-Writable Permission'));
+  assert.ok(labels.includes('Root Escalation'));
+
+  // Exit 139 (Segmentation fault) caught
+  assert.ok(forensics.exitFailures.some((e) => e.code === '139'));
+});

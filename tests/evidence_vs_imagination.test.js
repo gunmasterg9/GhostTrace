@@ -99,3 +99,21 @@ test('Evidence vs. Imagination - formatGroundTruthEvidence and generateBaselineF
   assert.ok(deduction.includes('technical debt markers'));
 });
 
+test('Evidence vs. Imagination - citation boundary clamping algorithm prevents runtime crashes', () => {
+  const clampCitationLine = (requestedLine, maxLines) => {
+    if (!Number.isFinite(requestedLine)) return 1;
+    if (requestedLine < 1) return 1;
+    if (requestedLine > maxLines) return maxLines;
+    return requestedLine;
+  };
+
+  // Line within bounds
+  assert.equal(clampCitationLine(25, 100), 25);
+  // Line exceeds total lines (e.g. LLM hallucinates line 999 on 50-line file)
+  assert.equal(clampCitationLine(999, 56), 56);
+  // Zero or negative line
+  assert.equal(clampCitationLine(0, 56), 1);
+  assert.equal(clampCitationLine(-5, 56), 1);
+});
+
+

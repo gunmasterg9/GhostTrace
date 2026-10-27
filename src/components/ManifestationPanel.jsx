@@ -31,12 +31,12 @@ export function ManifestationPanel({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Convert "line 42", "Line 12", "[Line 12]" into clickable citation spans
+  // Convert "line 42", "Line 12", "[Line 12]", and "[filename:Line 12]" into clickable citation spans
   const renderInteractiveStory = (text) => {
     if (!text) return null;
 
     const parts = [];
-    const citationRegex = /(?:\[|\b)([Ll]ine\s+(\d+))\]?/g;
+    const citationRegex = /(?:\[|\b)(?:([a-zA-Z0-9_.-]+\.[a-zA-Z0-9]+):)?([Ll]ine\s+(\d+))\]?/g;
     let lastIndex = 0;
     let match;
 
@@ -46,17 +46,19 @@ export function ManifestationPanel({
         parts.push(text.substring(lastIndex, match.index));
       }
 
-      const fullMatch = match[1];
-      const lineNum = parseInt(match[2], 10);
+      const filePrefix = match[1];
+      const fullMatch = match[2];
+      const lineNum = parseInt(match[3], 10);
+      const displayText = filePrefix ? `${filePrefix}:${fullMatch}` : fullMatch;
 
       parts.push(
         <button
           key={`cite-${match.index}`}
-          onClick={() => onSelectCitation(lineNum)}
+          onClick={() => onSelectCitation(lineNum, filePrefix)}
           className="inline-flex items-center gap-1 mx-1 px-1.5 py-0.5 rounded text-[11px] font-fira font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-400/50 hover:bg-cyan-900 transition-all cursor-pointer shadow-[0_0_8px_rgba(34,211,238,0.3)]"
-          title={`Click to inspect Line ${lineNum} in the Evidence Crypt`}
+          title={`Click to inspect ${displayText} in the Evidence Crypt`}
         >
-          📍 {fullMatch}
+          📍 {displayText}
         </button>
       );
 
@@ -68,6 +70,76 @@ export function ManifestationPanel({
     }
 
     return parts;
+  };
+
+  const renderNarrative = (text) => {
+    if (!text) return null;
+    const labels = [
+      {
+        key: 'VERIFIED EVIDENCE',
+        title: '1. Verified Evidence',
+        subtitle: 'Source-derived ground truth facts • Raw syntax & signatures',
+        tone: 'emerald',
+        icon: '📜',
+      },
+      {
+        key: 'AI INTERPRETATION',
+        title: '2. Forensic Interpretation',
+        subtitle: 'Probabilistic AI deduction • Pattern-based, uncertain analysis',
+        tone: 'amber',
+        icon: '🔬',
+      },
+      {
+        key: 'FICTIONAL NARRATIVE',
+        title: '3. Spectral Manifestation',
+        subtitle: 'Explicitly creative fiction • Gothic horror storytelling',
+        tone: 'purple',
+        icon: '🕯️',
+      },
+    ];
+    const headingPattern = /^\s*#{0,3}\s*(VERIFIED EVIDENCE|AI INTERPRETATION|FICTIONAL NARRATIVE)\s*:?\s*$/gim;
+    const matches = [...text.matchAll(headingPattern)];
+    if (matches.length < 3) {
+      return (
+        <div className="text-xs sm:text-sm leading-relaxed text-slate-200 whitespace-pre-wrap font-fira tracking-wide">
+          {renderInteractiveStory(text)}
+          {isGenerating && <span className="terminal-cursor" />}
+        </div>
+      );
+    }
+    const sections = matches.map((match, index) => ({
+      key: match[1].toUpperCase(),
+      body: text.slice(match.index + match[0].length, index + 1 < matches.length ? matches[index + 1].index : text.length).trim(),
+    }));
+    return (
+      <div className="space-y-4">
+        {sections.map((section) => {
+          const label = labels.find((item) => item.key === section.key);
+          if (!label) return null;
+          const toneClasses = label.tone === 'emerald'
+            ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300'
+            : label.tone === 'amber'
+              ? 'border-amber-500/40 bg-amber-950/20 text-amber-200'
+              : 'border-purple-500/40 bg-purple-950/20 text-purple-200';
+          return (
+            <section key={section.key} className={`rounded-lg border p-3.5 ${toneClasses}`}>
+              <div className="flex flex-wrap items-center justify-between gap-1 border-b border-white/10 pb-2 mb-2.5">
+                <h4 className="text-xs font-bold tracking-wider uppercase font-cinzel text-white flex items-center gap-1.5">
+                  <span>{label.icon}</span> {label.title}
+                </h4>
+                <span className="text-[10px] font-fira text-slate-400 italic">
+                  {label.subtitle}
+                </span>
+              </div>
+              <div className="text-xs sm:text-sm leading-relaxed text-slate-200 whitespace-pre-wrap font-fira">
+                {renderInteractiveStory(section.body || (isGenerating ? 'The signal is forming…' : 'No content supplied for this section.'))}
+              </div>
+            </section>
+          );
+        })}
+        {isGenerating && <span className="terminal-cursor" />}
+      </div>
+    );
   };
 
   return (
@@ -189,9 +261,8 @@ export function ManifestationPanel({
             </div>
 
             {/* The Manifested Gothic Story */}
-            <div className="text-xs sm:text-sm leading-relaxed text-slate-200 whitespace-pre-wrap font-fira tracking-wide selection:bg-cyan-500/30 selection:text-cyan-200">
-              {renderInteractiveStory(manifestationText)}
-              {isGenerating && <span className="terminal-cursor" />}
+            <div className="selection:bg-cyan-500/30 selection:text-cyan-200">
+              {renderNarrative(manifestationText)}
             </div>
 
             <div ref={terminalEndRef} />
@@ -229,7 +300,7 @@ export function ManifestationPanel({
       <div className="p-2.5 bg-[#080d14] border-t border-cyan-900/30 flex items-center justify-between text-[11px] font-fira text-slate-400">
         <div className="flex items-center gap-1.5">
           <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
-          <span>Interactive Citations: Click any <strong>[Line XX]</strong> badge to inspect truth.</span>
+          <span>Evidence is separated from interpretation and fiction. Click any <strong>[Line XX]</strong> badge to inspect the source.</span>
         </div>
         <span className="text-emerald-400/80 hidden sm:inline">100% Offline • Local Gemma</span>
       </div>

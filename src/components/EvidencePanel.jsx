@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Skull, AlertTriangle, Clock, ShieldCheck, Flame, Binary, ChevronRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Skull, AlertTriangle, Clock, ShieldCheck, Flame, Binary, ChevronRight, Terminal, Files } from 'lucide-react';
+import { isTerminalHistoryFile, analyzeTerminalHistory } from '../utils/terminalForensics';
 
 export function EvidencePanel({
   rawContent,
@@ -10,9 +11,29 @@ export function EvidencePanel({
   citationNotice,
   onDismissNotice,
 }) {
-  const [activeTab, setActiveTab] = useState('code'); // 'code' | 'markers'
+  const [activeTab, setActiveTab] = useState('code'); // 'code' | 'markers' | 'terminal'
   const [prevHighlightedLine, setPrevHighlightedLine] = useState(highlightedLine);
   const lines = rawContent.split('\n');
+
+  // Detect terminal history format
+  const terminalData = useMemo(() => {
+    if (isTerminalHistoryFile(forensics.filename, rawContent)) {
+      return analyzeTerminalHistory(rawContent, forensics.filename);
+    }
+    return null;
+  }, [rawContent, forensics.filename]);
+
+  // Detect multi-file boundaries from Digital Memory Explorer
+  const excavatedSubFiles = useMemo(() => {
+    const list = [];
+    lines.forEach((line, idx) => {
+      if (line.startsWith('===== FILE: ') && line.endsWith(' =====')) {
+        const name = line.replace('===== FILE: ', '').replace(' =====', '').trim();
+        list.push({ line: idx + 1, name });
+      }
+    });
+    return list;
+  }, [lines]);
 
   if (highlightedLine !== prevHighlightedLine) {
     setPrevHighlightedLine(highlightedLine);
@@ -104,37 +125,77 @@ export function EvidencePanel({
       )}
 
       {/* Forensic Findings Bar */}
-      <div className="p-2.5 bg-[#090f17] border-b border-cyan-900/30 flex flex-wrap items-center gap-2 text-xs font-fira">
-        <button
-          onClick={() => setActiveTab('code')}
-          className={`px-3 py-1 rounded transition-colors ${
-            activeTab === 'code' ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          Raw Syntax
-        </button>
+      <div className="p-2.5 bg-[#090f17] border-b border-cyan-900/30 flex flex-wrap items-center justify-between gap-2 text-xs font-fira">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setActiveTab('code')}
+            className={`px-3 py-1 rounded transition-colors cursor-pointer ${
+              activeTab === 'code' ? 'bg-cyan-950 text-cyan-300 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Raw Syntax
+          </button>
 
-        <button
-          onClick={() => setActiveTab('markers')}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors ${
-            activeTab === 'markers' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-          <span>Directives ({forensics.markers.length})</span>
-        </button>
+          <button
+            onClick={() => setActiveTab('markers')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors cursor-pointer ${
+              activeTab === 'markers' ? 'bg-amber-950/60 text-amber-300 border border-amber-500/30' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <span>Directives ({forensics.markers.length})</span>
+          </button>
 
-        {forensics.panics.length > 0 && (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[11px]">
-            <Skull className="w-3 h-3 text-rose-400" />
-            <span>{forensics.panics.length} Panics</span>
-          </div>
-        )}
+          {terminalData && (
+            <button
+              onClick={() => setActiveTab('terminal')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded transition-colors cursor-pointer ${
+                activeTab === 'terminal' ? 'bg-purple-950/60 text-purple-300 border border-purple-500/30' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-purple-400" />
+              <span>Haunted Terminal</span>
+            </button>
+          )}
 
-        {forensics.timestamps.length > 0 && (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-purple-950/40 border border-purple-500/30 text-purple-300 text-[11px]">
-            <Clock className="w-3 h-3 text-purple-400" />
-            <span>{forensics.timestamps.length} 3AM Markers</span>
+          {forensics.panics.length > 0 && (
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-950/40 border border-rose-500/30 text-rose-300 text-[11px]">
+              <Skull className="w-3 h-3 text-rose-400" />
+              <span>{forensics.panics.length} Panics</span>
+            </div>
+          )}
+
+          {forensics.timestamps.length > 0 && (
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-purple-950/40 border border-purple-500/30 text-purple-300 text-[11px]">
+              <Clock className="w-3 h-3 text-purple-400" />
+              <span>{forensics.timestamps.length} 3AM Markers</span>
+            </div>
+          )}
+        </div>
+
+        {/* Multi-File Excavation Navigation Dropdown */}
+        {excavatedSubFiles.length > 0 && (
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <Files className="w-3.5 h-3.5 text-cyan-400" />
+            <select
+              onChange={(e) => {
+                const line = parseInt(e.target.value, 10);
+                if (line) {
+                  setActiveTab('code');
+                  onLineClick(line);
+                  const el = document.getElementById(`evidence-line-${line}`);
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }}
+              className="bg-[#0b1219] text-cyan-300 border border-cyan-800/50 rounded px-2 py-0.5 text-xs outline-none cursor-pointer"
+            >
+              <option value="">Jump to File ({excavatedSubFiles.length})...</option>
+              {excavatedSubFiles.map((sf, idx) => (
+                <option key={idx} value={sf.line}>
+                  {sf.name} (Line {sf.line})
+                </option>
+              ))}
+            </select>
           </div>
         )}
       </div>
@@ -192,7 +253,7 @@ export function EvidencePanel({
               );
             })}
           </div>
-        ) : (
+        ) : activeTab === 'markers' ? (
           /* Forensic Markers Breakdown List */
           <div className="space-y-4">
             <div>
@@ -253,6 +314,95 @@ export function EvidencePanel({
                   ))}
                 </div>
               </div>
+            )}
+          </div>
+        ) : (
+          /* Haunted Terminal Static Forensics Screen */
+          <div className="space-y-4">
+            {/* Safe Execution Guarantee Banner */}
+            <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span>
+                <strong>Inert Text Guarantee:</strong> Terminal history is analyzed exclusively via static text parsing. GhostTrace <em>never</em> executes imported commands or spawns shell processes.
+              </span>
+            </div>
+
+            {/* Terminal Metrics Tiles */}
+            {terminalData && (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-fira">
+                  <div className="p-2.5 rounded-lg bg-[#0e1622] border border-cyan-900/40">
+                    <div className="text-[10px] text-slate-400 uppercase">Total Commands</div>
+                    <div className="text-base font-bold text-cyan-300 font-orbitron">{terminalData.totalCommands}</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#0e1622] border border-cyan-900/40">
+                    <div className="text-[10px] text-slate-400 uppercase">Unique Commands</div>
+                    <div className="text-base font-bold text-slate-200 font-orbitron">{terminalData.uniqueCommands}</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#140c11] border border-rose-900/40">
+                    <div className="text-[10px] text-rose-400 uppercase">Dangerous Ops</div>
+                    <div className="text-base font-bold text-rose-300 font-orbitron">{terminalData.dangerousCommands.length}</div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#110e1a] border border-purple-900/40">
+                    <div className="text-[10px] text-purple-400 uppercase">Repeated Loops</div>
+                    <div className="text-base font-bold text-purple-300 font-orbitron">{terminalData.repeatedLoops.length}</div>
+                  </div>
+                </div>
+
+                {/* Destructive / Dangerous Commands */}
+                {terminalData.dangerousCommands.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-bold text-rose-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Skull className="w-3.5 h-3.5" /> High-Risk / Destructive Commands (Static Inspection)
+                    </h3>
+                    <div className="space-y-2">
+                      {terminalData.dangerousCommands.map((dc, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setActiveTab('code');
+                            onLineClick(dc.line);
+                          }}
+                          className="p-2.5 rounded-lg bg-[#140c11] border border-rose-900/50 hover:border-rose-400/50 cursor-pointer transition-all flex items-start justify-between gap-2"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-500/40 text-[10px] font-bold">
+                                {dc.label}
+                              </span>
+                              <span className="text-rose-400 text-[11px]">Line {dc.line}</span>
+                            </div>
+                            <code className="text-rose-200 text-xs font-mono">{dc.command}</code>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-slate-500 shrink-0 self-center" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Repeated Frantic Loops */}
+                {terminalData.repeatedLoops.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" /> Frantic Command Loops (Repeated ≥3x)
+                    </h3>
+                    <div className="space-y-2">
+                      {terminalData.repeatedLoops.map((loop, idx) => (
+                        <div
+                          key={idx}
+                          className="p-2 rounded-lg bg-[#0e1622] border border-amber-900/30 flex items-center justify-between text-xs"
+                        >
+                          <code className="text-amber-200 font-mono truncate mr-2">{loop.command}</code>
+                          <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 font-bold text-[10px] shrink-0">
+                            {loop.count}× repeated
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

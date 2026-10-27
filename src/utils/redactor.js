@@ -9,8 +9,8 @@ const PATTERNS = [
   { name: 'Email Address', regex: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g },
   { name: 'IPv4 Address (Private)', regex: /\b(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})\b/g },
   { name: 'Bearer Auth', regex: /Bearer\s+([A-Za-z0-9_.-]{10,})/gi, redactGroup: 1 },
-  { name: 'Windows User Path', regex: /\b[A-Za-z]:\\(?:Users|Documents and Settings)\\[a-zA-Z0-9_.-]+(?:\\[^\s"'<>:;,\r\n]+)*/gi },
-  { name: 'Unix User Path', regex: /\b\/(?:home|Users)\/[a-zA-Z0-9_.-]+(?:\/[^\s"'<>:;,\r\n]+)*/gi },
+  { name: 'Windows User Path', regex: /(?:[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/][a-zA-Z0-9_.-]+(?:[\\/][^\s"'<>:;,\r\n]+)*)/gi },
+  { name: 'Unix User Path', regex: /(?:\/(?:home|Users)\/[a-zA-Z0-9_.-]+(?:\/[^\s"'<>:;,\r\n]+)*)/gi },
 ];
 
 export function redactSensitiveData(rawContent) {

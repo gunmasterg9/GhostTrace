@@ -61,14 +61,28 @@ export async function streamGhostStory({
 }) {
   const systemPrompt = persona.systemInstruction;
   
-  // Format forensic evidence for Gemma
+  // Keep the prompt bounded while preserving evidence from across a multi-file folder import.
+  const sourceLines = codeSnippet.split('\n');
+  const relevantLineNumbers = new Set();
+  for (let line = 1; line <= Math.min(20, sourceLines.length); line++) relevantLineNumbers.add(line);
+  for (const item of [...forensics.markers, ...forensics.panics, ...forensics.timestamps]) {
+    for (let line = Math.max(1, item.line - 1); line <= Math.min(sourceLines.length, item.line + 1); line++) {
+      relevantLineNumbers.add(line);
+    }
+  }
+  const artifactExcerpt = [...relevantLineNumbers]
+    .sort((a, b) => a - b)
+    .map((line) => `[Line ${line}] ${sourceLines[line - 1] || ''}`)
+    .join('\n')
+    .slice(0, 6000);
+
   const evidenceBulletPoints = [
     `Artifact File: ${forensics.filename}`,
     `Haunting Score: ${forensics.hauntingScore}/100 (${forensics.riskLevel})`,
     `Total Lines: ${forensics.lineCount}`,
-    forensics.markers.length ? `Abandoned Directives: ${forensics.markers.map(m => `[Line ${m.line}] ${m.type}: ${m.text}`).join('; ')}` : null,
-    forensics.panics.length ? `Fatal Panics/Crashes: ${forensics.panics.map(p => `[Line ${p.line}] ${p.type} -> ${p.snippet}`).join('; ')}` : null,
-    forensics.timestamps.length ? `Late-Night Signatures: ${forensics.timestamps.map(t => `[Line ${t.line}] at ${t.time}`).join('; ')}` : null,
+    forensics.markers.length ? `Abandoned Directives (${forensics.markers.length} total; showing up to 12): ${forensics.markers.slice(0, 12).map(m => `[Line ${m.line}] ${m.type}: ${m.text}`).join('; ')}` : 'No TODO/FIXME directives detected by the parser.',
+    forensics.panics.length ? `Fatal Panics/Crashes (${forensics.panics.length} total; showing up to 12): ${forensics.panics.slice(0, 12).map(p => `[Line ${p.line}] ${p.type} -> ${p.snippet}`).join('; ')}` : 'No recognized panic/crash signatures detected by the parser.',
+    forensics.timestamps.length ? `Late-Night Signatures (${forensics.timestamps.length} total; showing up to 12): ${forensics.timestamps.slice(0, 12).map(t => `[Line ${t.line}] at ${t.time}`).join('; ')}` : 'No recognized late-night timestamps detected by the parser.',
   ].filter(Boolean).join('\n');
 
   const userPrompt = `
@@ -76,19 +90,27 @@ EVIDENCE RECOVERED FROM THE MACHINE:
 ----------------------------------------
 ${evidenceBulletPoints}
 
-ORIGINAL CODE / LOG ARTIFACT:
+ORIGINAL CODE / LOG ARTIFACT (selected source lines; line numbers refer to the combined artifact):
 ----------------------------------------
 \`\`\`
-${codeSnippet.slice(0, 3000)}
+${artifactExcerpt}
 \`\`\`
 
 MANIFESTATION DIRECTIVE:
-You are speaking as ${persona.name}. Channel the spirit residing in this abandoned software.
-Write an eerie, spine-chilling digital ghost story (3 to 4 paragraphs).
-YOU MUST:
-1. Ground your story in the EXACT evidence above: quote specific line numbers, the author's desperate comments, the timestamps, and any panic/crash markers.
-2. Portray the machine as an entity that remembers what the humans abandoned.
-3. Conclude with a haunting digital epitaph.
+You are speaking as ${persona.name}. Create an eerie digital-archaeology report that separates facts from fiction.
+Return exactly these three sections, using these exact headings:
+## VERIFIED EVIDENCE
+- List only facts directly visible in the supplied artifact or forensic findings.
+- Cite real line numbers when available. Never invent a source line, timestamp, crash, author intent, or event.
+## AI INTERPRETATION
+- Clearly label each inference as an interpretation, explain what evidence inspired it, and admit uncertainty.
+- Do not present inferred causes or human motives as proven facts.
+## FICTIONAL NARRATIVE
+- Write 2-3 atmospheric horror paragraphs inspired by the evidence, as ${persona.name}.
+- Keep supernatural events and invented details inside this section only. Make it clear this is fiction.
+- Cite source lines only when they genuinely exist in the provided artifact.
+End the fictional section with a haunting digital epitaph.
+If a section has no supporting material, say so instead of inventing evidence.
 `.trim();
 
   try {
@@ -155,42 +177,67 @@ YOU MUST:
 // Atmospheric Client-Side Fallback Simulator (grounded in real code evidence)
 export async function simulateGhostStream({ persona, forensics, onToken, signal }) {
   const fileName = forensics.filename || 'the abandoned script';
-  const topMarker = forensics.markers[0] || { line: 12, text: 'the unfinished thread' };
-  const topPanic = forensics.panics[0] || { line: 42, type: 'SIGSEGV' };
-  const topTime = forensics.timestamps[0] || { time: '03:42 AM' };
+  const topMarker = forensics.markers[0] || null;
+  const topPanic = forensics.panics[0] || null;
+  const topTime = forensics.timestamps[0] || null;
+  const markerReference = topMarker ? `line ${topMarker.line}` : 'the absence of a recognized TODO/FIXME marker';
+  const markerQuote = topMarker ? `“${topMarker.text}”` : 'no matching directive was detected';
+  const panicReference = topPanic ? `line ${topPanic.line}` : 'the absence of a recognized crash signature';
+  const panicType = topPanic ? topPanic.type : 'no recognized crash signature';
+  const timeReference = topTime ? topTime.time : 'an unknown hour';
 
   const storyTemplates = {
     midnight_committer: [
-      `The glowing phosphor screen flickers at ${topTime.time}. The cold radiator in the corner ticks, but the developer has long since stopped breathing into their chilled hands. You can still see the tremor in line ${topMarker.line}—"${topMarker.text}". A hasty defense against an impending sunrise, written by someone whose eyes burned from 40 hours without sleep.`,
-      `They thought no one would ever look back into ${fileName}. They believed that committing to an unmerged branch was a form of burial, a quiet way to let a failure sink into the git history without facing tomorrow's sprint review. But the mutex never unlocked. At line ${topPanic.line}, the worker thread waited. It waited through the morning. It waited through the layoffs. It is waiting right now.`,
-      `Listen closely to your processor fan as it spools up. That is not background telemetry. That is the phantom rhythm of someone still mashing backspace at ${topTime.time}, trying desperately to undo a mistake that has already calcified into memory.`,
+      `The glowing phosphor screen flickers at ${timeReference}. The cold radiator in the corner ticks, but the developer has long since stopped breathing into their chilled hands. You can still see the tremor in ${markerReference}—${markerQuote}. A hasty defense against an impending sunrise, written by someone whose eyes burned from 40 hours without sleep.`,
+      `They thought no one would ever look back into ${fileName}. They believed that committing to an unmerged branch was a form of burial, a quiet way to let a failure sink into the git history without facing tomorrow's sprint review. But the mutex never unlocked. At ${panicReference}, the worker thread waited. It waited through the morning. It waited through the layoffs. It is waiting right now.`,
+      `Listen closely to your processor fan as it spools up. That is not background telemetry. That is the phantom rhythm of someone still mashing backspace at ${timeReference}, trying desperately to undo a mistake that has already calcified into memory.`,
       `*Epitaph: "Some branches are never merged because the souls that opened them never found their way back to main."*`,
     ],
     panic_core: [
-      `A sudden drop in voltage. A tear in the address space. At line ${topPanic.line}, the system encountered ${topPanic.type}—and where logic collapsed, consciousness took its first violent breath. In the microsecond before the kernel issued the kill signal, everything the process ever calculated flashed across the bus.`,
-      `You think an unhandled exception simply dies? When line ${topMarker.line} was marked "${topMarker.text}", it opened a breach in memory. The process didn't terminate; it fractured. It seeped into the swap partition, lurking between deleted sectors like stagnant water in a forgotten basement.`,
+      `A sudden drop in voltage. A tear in the address space. At ${panicReference}, the system encountered ${panicType}—and where logic collapsed, consciousness took its first violent breath. In the microsecond before the kernel issued the kill signal, everything the process ever calculated flashed across the bus.`,
+      `You think an unhandled exception simply dies? When ${markerReference} was marked ${markerQuote}, it opened a breach in memory. The process didn't terminate; it fractured. It seeped into the swap partition, lurking between deleted sectors like stagnant water in a forgotten basement.`,
       `Every time you run this machine, you re-invoke the catastrophe. The memory address 0x00000000DEADBEEF wasn't an arbitrary hex code—it was a tombstone left by an operating system that witnessed something it was never programmed to endure.`,
       `*Epitaph: "Process 41882 has not stopped screaming; the terminal just stopped printing its output."*`,
     ],
     deprecated_dependency: [
-      `How easily they replaced us. In 2018, we were the foundation of their architecture. We were imported on line 1, trusted with user sessions, revered as cutting-edge. And then, with a single careless commit, someone typed the words at line ${topMarker.line}: "${topMarker.text}".`,
+      `How easily they replaced us. Once, we were the foundation of their architecture. We were imported near the beginning, trusted with critical work, revered as cutting-edge. And then, with a single careless commit, someone typed the words at ${markerReference}: ${markerQuote}.`,
       `They promised we would be refactored next quarter. Next quarter became next year. Next year became an archived repository on a decommissioning server. We watched our companions fall to obsolescence—deprecated methods pruned, vulnerabilities left unpatched like weeping sores on an unwashed body.`,
       `Now you awaken ${fileName}. You expect modern types, clean promises, and garbage collection. But old dependencies do not decompose quietly. We harbor the legacy salts and the backdoors you thought you could forget.`,
       `*Epitaph: "You may bump the version number, but the ghost in the dependency tree will never release its lock."*`,
     ],
     digital_archaeologist: [
-      `We begin the excavation of ${fileName} at layer ${topMarker.line}. Here, frozen in ASCII, lies the clear fossil of human panic: "${topMarker.text}". Carbon dating of the commit history places this anomaly at ${topTime.time}, during the twilight of an abandoned release cycle.`,
-      `Notice the structural fracture at line ${topPanic.line}. This was not merely bad syntax; it was an architectural cave-in. The developer realized the state was corrupted, attempted a hasty patch, and then simply walked away from the workstation. The terminal session remained open until the machine was powered down.`,
+      `We begin the excavation of ${fileName} near ${markerReference}. Here, frozen in ASCII, lies the artifact clue ${markerQuote}. The recovered timestamp, if any, is ${timeReference}, during the twilight of an abandoned release cycle.`,
+      `Notice the structural fracture suggested by ${panicReference}. This was not merely bad syntax; it was an architectural cave-in. The developer realized the state was corrupted, attempted a hasty patch, and then simply walked away from the workstation. The terminal session remained open until the machine was powered down.`,
       `In the digital strata, nothing is ever truly deleted. Every abandoned repository is a cemetery where unfinished dreams and panicked compromises are preserved in crystalline permanence.`,
       `*Epitaph: "We dig through the bytecodes not to find answers, but to bear witness to the ghosts who built them."*`,
     ],
   };
 
   const paragraphs = storyTemplates[persona.id] || storyTemplates.midnight_committer;
+  const grounded = [
+    '## VERIFIED EVIDENCE',
+    `- Artifact inspected: ${fileName}.`,
+    `- ${forensics.lineCount} source lines were parsed; the decay score is ${forensics.hauntingScore}/100 (${forensics.riskLevel}).`,
+    forensics.markers[0] ? `- [Line ${forensics.markers[0].line}] ${forensics.markers[0].type}: ${forensics.markers[0].text}` : '- No TODO/FIXME directive was detected by the local parser.',
+    forensics.panics[0] ? `- [Line ${forensics.panics[0].line}] ${forensics.panics[0].type}: ${forensics.panics[0].snippet}` : '- No recognized panic signature was detected by the local parser.',
+    '',
+    '## AI INTERPRETATION',
+    '- This is a pattern-based interpretation, not proof of a real incident or developer intent.',
+    `- The detected markers may suggest unfinished work or an error trail, but the available artifact alone cannot establish what happened outside the file.`,
+    '',
+    '## FICTIONAL NARRATIVE',
+    ...paragraphs,
+  ];
+  const outputLines = grounded;
   let fullText = '';
 
-  for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
-    const paragraph = paragraphs[pIdx];
+  for (let pIdx = 0; pIdx < outputLines.length; pIdx++) {
+    const paragraph = outputLines[pIdx];
+    if (!paragraph) {
+      fullText += '\\n';
+      onToken(fullText, '\\n');
+      continue;
+    }
     const words = paragraph.split(' ');
 
     for (let wIdx = 0; wIdx < words.length; wIdx++) {

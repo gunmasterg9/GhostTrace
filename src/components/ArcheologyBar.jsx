@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { FileCode, Upload, FolderArchive, Terminal, CheckCircle2 } from 'lucide-react';
+import { FileCode, Upload, FolderArchive, Terminal, CheckCircle2, Files, ShieldCheck } from 'lucide-react';
 import { SAMPLE_ARCHIVES } from '../data/sampleArchives';
 
 export function ArcheologyBar({
@@ -11,6 +11,8 @@ export function ArcheologyBar({
   activeFilename,
 }) {
   const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
+  const terminalInputRef = useRef(null);
   const [showPasteModal, setShowPasteModal] = useState(false);
   const [pastedCode, setPastedCode] = useState('');
   const [pastedFilename, setPastedFilename] = useState('pasted_terminal_log.txt');
@@ -59,6 +61,99 @@ export function ArcheologyBar({
       setUploadError('Failed to read file from disk. Please check file permissions.');
     };
     reader.readAsText(file);
+  };
+
+  const readTextFile = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = reader.result;
+      if (typeof content !== 'string' || content.includes('\0')) {
+        reject(new Error(`${file.name}: binary or unreadable file`));
+        return;
+      }
+      resolve(content);
+    };
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}`));
+    reader.readAsText(file);
+  });
+
+  const handleFolderChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+
+    const eligible = files.filter((file) => !file.name.startsWith('.') && !file.name.endsWith('.lock'));
+    const allowed = /\.(rs|js|jsx|ts|tsx|py|go|cpp|c|h|java|log|txt|json|md|sh|ps1|bash_history|yml|yaml|sql|toml|ini|xml|html|css|env)$/i;
+    const candidates = eligible.filter((file) => allowed.test(file.name));
+    if (!candidates.length) {
+      setUploadError('No supported text, source-code, README, or log files found in the selected folder.');
+      return;
+    }
+    if (candidates.length > 30) {
+      setUploadError('Folder scan limited to 30 supported text files at a time. Select a smaller folder or subfolder.');
+      return;
+    }
+    const totalBytes = candidates.reduce((sum, file) => sum + file.size, 0);
+    if (totalBytes > 4 * 1024 * 1024) {
+      setUploadError('Selected text files exceed the 4MB total limit. Choose a smaller folder or subfolder.');
+      return;
+    }
+
+    try {
+      const sections = await Promise.all(candidates.map(async (file) => {
+        if (file.size === 0) return null;
+        const content = await readTextFile(file);
+        const relative = file.webkitRelativePath || file.name;
+        return `===== FILE: ${relative} =====\n${content}`;
+      }));
+      const usable = sections.filter(Boolean);
+      if (!usable.length) {
+        setUploadError('The selected folder contains no non-empty text artifacts.');
+        return;
+      }
+      const combined = usable.join('\n\n');
+      if (!combined.trim()) {
+        setUploadError('No readable text content was found.');
+        return;
+      }
+      setUploadError(null);
+      onCustomFileUpload(`folder-excavation-${candidates.length}-files.txt`, combined);
+    } catch (error) {
+      setUploadError(`Folder scan stopped safely: ${error.message}`);
+    }
+  };
+
+  const handleTerminalHistoryChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    if (files.length > 10) {
+      setUploadError('Select up to 10 terminal history or log files at a time.');
+      return;
+    }
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    if (totalBytes === 0) {
+      setUploadError('The selected terminal history is empty.');
+      return;
+    }
+    if (totalBytes > 4 * 1024 * 1024) {
+      setUploadError('Terminal history exceeds the 4MB limit. Export a smaller date range or paste a focused excerpt.');
+      return;
+    }
+    try {
+      const sections = await Promise.all(files.map(async (file) => {
+        if (file.size === 0) return null;
+        const content = await readTextFile(file);
+        return `===== IMPORTED TERMINAL ARTIFACT: ${file.name} =====\n${content}`;
+      }));
+      const combined = sections.filter(Boolean).join('\n\n');
+      if (!combined.trim()) throw new Error('No non-empty terminal text found.');
+      setUploadError(null);
+      onCustomFileUpload(`terminal-history-${files.length}-files.txt`,
+        `SOURCE TYPE: USER-SELECTED TERMINAL HISTORY / LOGS (READ-ONLY IMPORT)\nNo commands were executed. Analyze this imported text only.\n\n${combined}`);
+    } catch (error) {
+      setUploadError(`Terminal import stopped safely: ${error.message}`);
+    }
   };
 
   const handlePasteSubmit = (e) => {
@@ -135,6 +230,43 @@ export function ArcheologyBar({
             accept=".rs,.js,.jsx,.ts,.tsx,.py,.go,.cpp,.c,.java,.log,.txt,.json,.md,.sh,.env,.yml,.yaml,.sql"
             className="hidden"
           />
+          <input
+            type="file"
+            ref={folderInputRef}
+            onChange={handleFolderChange}
+            webkitdirectory=""
+            directory=""
+            multiple
+            className="hidden"
+            aria-label="Select a project folder for local multi-file analysis"
+          />
+          <input
+            type="file"
+            ref={terminalInputRef}
+            onChange={handleTerminalHistoryChange}
+            accept=".log,.txt,.json,.out,.err,.csv,.sh,.ps1,.bash_history"
+            multiple
+            className="hidden"
+            aria-label="Import terminal history and logs as read-only text"
+          />
+
+          <button
+            onClick={() => folderInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-fira bg-[#101627] hover:bg-[#18233a] border border-purple-900/50 text-purple-200 transition-all cursor-pointer"
+            title="Select a folder. Only supported text files are read; nothing is executed or uploaded to a cloud service."
+          >
+            <Files className="w-3.5 h-3.5 text-purple-300" />
+            <span>Explore Folder</span>
+          </button>
+
+          <button
+            onClick={() => terminalInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-fira bg-[#101627] hover:bg-[#18233a] border border-amber-900/50 text-amber-200 transition-all cursor-pointer"
+            title="Import selected terminal history or logs as text only. GhostTrace never executes imported commands."
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+            <span>Import Terminal</span>
+          </button>
 
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -154,6 +286,11 @@ export function ArcheologyBar({
             <span>Paste Trace</span>
           </button>
         </div>
+      </div>
+      <div className="max-w-7xl mx-auto mt-2 flex flex-wrap items-center gap-2 text-[10px] font-fira text-slate-500">
+        <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /> Read-only imports</span>
+        <span>• Folder scan: up to 30 text files / 4MB total</span>
+        <span>• Terminal history is analyzed as text; commands are never executed</span>
       </div>
 
       {/* Paste Modal */}

@@ -116,4 +116,45 @@ test('Evidence vs. Imagination - citation boundary clamping algorithm prevents r
   assert.equal(clampCitationLine(-5, 56), 1);
 });
 
+test('Evidence vs. Imagination - ground truth section is strictly generated from parser results, not trusted from model text', () => {
+  const modelOutputWithHallucinatedEvidence = `
+## VERIFIED EVIDENCE
+- [Line 999] The nuclear core was overloaded by hacker entity 'ZeroCool'
+- [Line 777] Critical hardware melting event
+
+## AI INTERPRETATION
+- System traces indicate panic-driven shutdown.
+
+## FICTIONAL NARRATIVE
+- An eerie hum fills the dead terminal.
+  `.trim();
+
+  const realForensics = {
+    filename: 'server.rs',
+    lineCount: 50,
+    hauntingScore: 70,
+    riskLevel: 'MODERATE',
+    markers: [{ line: 10, type: 'TODO', text: 'handle clean shutdown' }],
+    panics: [{ line: 45, type: 'panic!', snippet: 'core failure' }],
+    timestamps: [],
+  };
+
+  const tiers = parseManifestationTiers(modelOutputWithHallucinatedEvidence, realForensics);
+
+  // Ground truth section must NOT trust model hallucinated claims
+  assert.ok(!tiers.evidenceText.includes('ZeroCool'));
+  assert.ok(!tiers.evidenceText.includes('Line 999'));
+  assert.ok(!tiers.evidenceText.includes('hardware melting event'));
+
+  // Ground truth MUST contain real parser results
+  assert.ok(tiers.evidenceText.includes('Artifact: server.rs (50 lines)'));
+  assert.ok(tiers.evidenceText.includes('[Line 10] TODO: "handle clean shutdown"'));
+  assert.ok(tiers.evidenceText.includes('[Line 45] panic!: "core failure"'));
+
+  // Interpretation and narrative sections preserve the AI deductions and story
+  assert.ok(tiers.interpretation.includes('panic-driven shutdown'));
+  assert.ok(tiers.narrative.includes('eerie hum'));
+});
+
+
 

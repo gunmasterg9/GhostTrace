@@ -10,30 +10,41 @@ export function EvidencePanel({
   onLineClick,
   citationNotice,
   onDismissNotice,
+  terminalData: propTerminalData,
+  isTerminalMode,
+  memoryManifest,
 }) {
-  const [activeTab, setActiveTab] = useState('code'); // 'code' | 'markers' | 'terminal'
+  const [activeTab, setActiveTab] = useState(isTerminalMode ? 'terminal' : 'code'); // 'code' | 'markers' | 'terminal'
   const [prevHighlightedLine, setPrevHighlightedLine] = useState(highlightedLine);
   const lines = rawContent.split('\n');
 
-  // Detect terminal history format
+  // Detect terminal history format or use prop-passed terminal data
   const terminalData = useMemo(() => {
+    if (propTerminalData) return propTerminalData;
     if (isTerminalHistoryFile(forensics.filename, rawContent)) {
       return analyzeTerminalHistory(rawContent, forensics.filename);
     }
     return null;
-  }, [rawContent, forensics.filename]);
+  }, [propTerminalData, rawContent, forensics.filename]);
 
-  // Detect multi-file boundaries from Digital Memory Explorer
+  // Detect multi-file boundaries from Digital Memory Explorer manifest or headers
   const excavatedSubFiles = useMemo(() => {
+    if (memoryManifest && memoryManifest.length > 0) {
+      return memoryManifest.map((m) => ({
+        line: m.contentStartLine,
+        headerLine: m.headerLine,
+        name: m.path,
+      }));
+    }
     const list = [];
     lines.forEach((line, idx) => {
       if (line.startsWith('===== FILE: ') && line.endsWith(' =====')) {
         const name = line.replace('===== FILE: ', '').replace(' =====', '').trim();
-        list.push({ line: idx + 1, name });
+        list.push({ line: idx + 2, headerLine: idx + 1, name });
       }
     });
     return list;
-  }, [lines]);
+  }, [memoryManifest, lines]);
 
   if (highlightedLine !== prevHighlightedLine) {
     setPrevHighlightedLine(highlightedLine);

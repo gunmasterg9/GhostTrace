@@ -22,9 +22,9 @@ The project unites open-weight AI, local-first computing, software archaeology, 
 - 🧠 **Local Gemma Inference:** Powered by local Gemma models running via Ollama (`http://localhost:11434`), auto-detecting models like `gemma4:e4b`, `gemma2:9b`, etc.
 - 🔒 **Privacy-First Redaction Shield:** Sensitive tokens, Bearer auth, private keys, passwords, and local Windows user paths are automatically stripped on the client before inference.
 - 📴 **Offline By Design:** Works with zero internet connection once dependencies and the model are installed. Features an atmospheric offline fallback simulation engine.
-- 📜 **Evidence vs. Imagination:** The séance requests three clearly separated sections: `VERIFIED EVIDENCE` (directly detected facts), `AI INTERPRETATION` (uncertain inferences), and `FICTIONAL NARRATIVE` (the spooky story). Click valid `[Line XX]` citations to inspect the source.
-- 🏛️ **Digital Memory Explorer:** Choose a folder in the browser's folder picker to inspect up to 30 supported text/source files, with a 4MB combined limit. Files are read in the browser and combined into one evidence artifact; no recursive disk access occurs outside the folder the user explicitly selects.
-- 👻 **Haunted Terminal Import:** Import selected terminal history or log files as read-only text. GhostTrace never executes imported commands. Multi-file terminal imports are limited to 10 files and 4MB total.
+- 📜 **Evidence vs. Imagination:** The séance presents three strictly separated sections: `VERIFIED EVIDENCE` (deterministic, parser-derived source facts), `AI INTERPRETATION` (uncertain technical inferences), and `FICTIONAL NARRATIVE` / `SPECTRAL MANIFESTATION` (the spooky story). Verified evidence is always generated from parser results, not trusted from model text. Click valid `[Line XX]` or `[relative/path.ext:Line XX]` citations to inspect the source.
+- 🏛️ **Digital Memory Explorer:** Choose a folder in the browser's folder picker to inspect up to 30 supported text/source files, with a 2MB combined limit (max 500KB per file). Pre-redacts all files and maintains an exact line-level manifest for file-relative citation resolution; no recursive disk access occurs outside the folder the user explicitly selects.
+- 👻 **Haunted Terminal Import:** Import selected terminal history or log files as read-only, inert text. Explicit terminal forensic state analyzes desperation command loops, exit failures (`137`, `139`), and destructive commands (`rm -rf`, `drop database`). GhostTrace never executes imported commands (zero eval, shell, or subprocess execution). Multi-file terminal imports are limited to 10 files and 2MB total.
 - 🕯️ **Séance Terminal & EVP Audio:** Retro CRT phosphor styling, scanline curvature, and Web Audio API synthesized EVP radio static and sub-bass drone. EVP effects are sound design, not speech synthesis.
 - 📁 **Forensic Necronomicon Dossier:** One-click export of complete `ghosttrace_dossier.md` files combining code forensics, decay metrics, and channeled narratives.
 
@@ -34,24 +34,26 @@ The project unites open-weight AI, local-first computing, software archaeology, 
 
 ### Evidence vs. Imagination
 Each generated séance is structured into three labeled sections:
-- **Verified Evidence:** parser findings and direct artifact observations.
-- **AI Interpretation:** uncertain explanations that are explicitly not treated as proven facts.
-- **Fictional Narrative:** the horror story, clearly marked as creative fiction.
+- **Verified Evidence:** Strictly derived from local parser findings and direct artifact observations. Model text is never trusted for ground truth.
+- **AI Interpretation:** Uncertain explanations that are explicitly labeled as probabilistic AI deductions.
+- **Fictional Narrative:** Atmospheric gothic horror storytelling, clearly marked as creative fiction.
 
 The offline simulation uses the same section structure and avoids inventing evidence citations when no matching marker exists.
 
 ### Digital Memory Explorer
 Click **Explore Folder** and select a project folder in the browser picker. GhostTrace reads only supported text/source files that the user explicitly selected:
 - Up to 30 supported files per scan.
-- 4MB combined size limit.
-- Supported formats include source code, README/Markdown, JSON, configuration, and log/text files.
-- Files are combined into a single forensic artifact with file-name separators. Citation line numbers refer to that combined artifact.
+- 2MB combined size limit (500KB per file).
+- Supported formats include source code, README/Markdown, JSON, configuration, shell, and log/text files.
+- Each file is redacted client-side before inference.
+- Files are combined into a single forensic artifact with an exact line-level manifest, enabling accurate file-relative citations (`[relative/path.ext:Line N]`) with boundary clamping.
 
 ### Haunted Terminal
 Click **Import Terminal** and select terminal history or log files. Imports are read-only text analysis:
-- Up to 10 files and 4MB total.
-- Imported commands are never executed.
-- Use only history/log files you intentionally select. Redaction runs before the text is sent to local inference.
+- Up to 10 files and 2MB total.
+- Commands are analyzed as inert text strings; no shell, eval, or execution pathway exists.
+- Extracts repeated command desperation loops (≥3x streaks), flags destructive operations (`rm -rf`, `drop database`, `dd`, `git reset --hard`), and catches abnormal exit codes (`137`, `139`).
+- Sensitive passwords, tokens, and paths are redacted before any text reaches the local Gemma model.
 
 These workflows operate in the browser. They do not recursively scan your disk without a user-selected folder, and they do not require a cloud inference API.
 
@@ -113,7 +115,7 @@ GhostTrace/
 │   │   └── terminalForensics.js   # Inert text-only terminal history & failure loop analyzer
 │   ├── App.jsx                    # Core application orchestrator & dossier exporter
 │   └── index.css                  # Cyber-gothic CRT design system
-├── tests/                         # Node.js native automated test suite (14 tests)
+├── tests/                         # Node.js native automated test suite (18 tests)
 │   ├── evidence_vs_imagination.test.js
 │   ├── haunted_terminal.test.js
 │   ├── memory_explorer.test.js
@@ -132,11 +134,13 @@ GhostTrace includes a complete native automated test suite with zero extra test-
 npm test
 ```
 
-Verifies all 14 test cases across the core pillars:
-- **Evidence vs. Imagination:** Validates epistemic tier separation, fallback handling, multi-file citation regex, and citation boundary clamping.
-- **Haunted Terminal:** Validates inert text parsing without shell execution, detection of dangerous commands (`rm -rf`, `drop database`, `dd`, `git reset --hard`), failure exit codes (`137`, `139`), and command repetition loops.
-- **Digital Memory Explorer:** Validates file-count limits (max 30), total size bounds, binary file rejection (null-byte inspection), and automated pre-inference privacy redaction.
+Verifies all 18 test cases across the core pillars:
+- **Evidence vs. Imagination:** Validates epistemic tier separation, fallback handling, multi-file citation regex, citation boundary clamping, and strict enforcement of parser-derived ground-truth over model hallucinations.
+- **Haunted Terminal:** Validates inert text parsing without shell execution, detection of dangerous commands (`rm -rf`, `drop database`, `dd`, `git reset --hard`), failure exit codes (`137`, `139`), command repetition loops, and client-side credential redaction before inference.
+- **Digital Memory Explorer:** Validates file-count limits (max 30), total size bounds (2MB aggregate, 500KB per file), binary file rejection (null-byte inspection), line-level manifest arithmetic, and pre-inference privacy redaction.
+- **Multi-File Citations:** Validates `resolveCitationTarget()` mapping for relative paths, first and later files, duplicate basenames, Windows/Unix path separators, line 1, last line, out-of-bounds line clamping, and preserving combined artifact lines when no file prefix is present.
 - **Redaction Shield:** Validates client-side sanitization of API keys, passwords, Bearer tokens, and Windows/Unix file paths.
+
 
 
 ---

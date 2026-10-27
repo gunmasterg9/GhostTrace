@@ -11,6 +11,8 @@ import { analyzeEvidence } from './utils/forensics';
 import { checkOllamaStatus, streamGhostStory } from './utils/ollama';
 import { spectralAudio } from './utils/audio';
 import { parseManifestationTiers } from './utils/manifestationParser';
+import { resolveCitationTarget } from './utils/memoryExplorer';
+import { isTerminalHistoryFile, analyzeTerminalHistory } from './utils/terminalForensics';
 
 const initialArchive = SAMPLE_ARCHIVES.find((a) => a.id === 'vault_cipher') || SAMPLE_ARCHIVES[0];
 const initialRedacted = redactSensitiveData(initialArchive.content);
@@ -39,6 +41,13 @@ export default function App() {
   const [storySource, setStorySource] = useState(null);
   const [citationNotice, setCitationNotice] = useState(null);
 
+  // Explicit Terminal Forensics State
+  const [terminalData, setTerminalData] = useState(null);
+  const [isTerminalMode, setIsTerminalMode] = useState(false);
+
+  // Digital Memory Explorer Line Manifest
+  const [memoryManifest, setMemoryManifest] = useState([]);
+
   const abortControllerRef = useRef(null);
 
   const processContent = (content, filename) => {
@@ -61,8 +70,18 @@ export default function App() {
     setHighlightedLine(null);
     setStorySource(null);
     setCitationNotice(null);
+    setMemoryManifest([]);
 
     processContent(archive.content, archive.filename);
+
+    if (isTerminalHistoryFile(archive.filename, archive.content)) {
+      const term = analyzeTerminalHistory(archive.content, archive.filename);
+      setTerminalData(term);
+      setIsTerminalMode(true);
+    } else {
+      setTerminalData(null);
+      setIsTerminalMode(false);
+    }
 
     if (archive.defaultPersona) {
       const p = GHOST_PERSONAS.find((item) => item.id === archive.defaultPersona);
@@ -101,6 +120,60 @@ export default function App() {
     setHighlightedLine(null);
     setStorySource(null);
     setCitationNotice(null);
+    setMemoryManifest([]);
+
+    if (isTerminalHistoryFile(filename, content)) {
+      const term = analyzeTerminalHistory(content, filename);
+      setTerminalData(term);
+      setIsTerminalMode(true);
+    } else {
+      setTerminalData(null);
+      setIsTerminalMode(false);
+    }
+
+    processContent(content, filename);
+  };
+
+  const handleFolderAnalysis = (analysisResult) => {
+    setIsCustomFile(true);
+    const filename = `folder-excavation-${analysisResult.totalFiles}-files.txt`;
+    setActiveFilename(filename);
+    setManifestationText('');
+    setHighlightedLine(null);
+    setStorySource(null);
+    setCitationNotice(null);
+    setIsTerminalMode(false);
+    setTerminalData(null);
+
+    // Save the line-level file manifest for file-relative citation resolution
+    setMemoryManifest(analysisResult.manifest || []);
+
+    // Set combined artifact; pre-redacted content is used for forensics and model payload
+    setRawContent(analysisResult.combinedArtifact);
+    setRedactedData({
+      sanitized: analysisResult.combinedRedacted,
+      redactionCount: analysisResult.totalRedactions,
+      redactions: [],
+    });
+
+    const forensics = analyzeEvidence(analysisResult.combinedRedacted, filename);
+    setForensicData(forensics);
+  };
+
+  const handleTerminalImport = (filename, content) => {
+    setIsCustomFile(true);
+    setActiveFilename(filename);
+    setManifestationText('');
+    setHighlightedLine(null);
+    setStorySource(null);
+    setCitationNotice(null);
+    setMemoryManifest([]);
+
+    // Parse strictly as inert text without executing commands
+    const term = analyzeTerminalHistory(content, filename);
+    setTerminalData(term);
+    setIsTerminalMode(true);
+
     processContent(content, filename);
   };
 
@@ -111,6 +184,17 @@ export default function App() {
     setHighlightedLine(null);
     setStorySource(null);
     setCitationNotice(null);
+    setMemoryManifest([]);
+
+    if (isTerminalHistoryFile(filename, content)) {
+      const term = analyzeTerminalHistory(content, filename);
+      setTerminalData(term);
+      setIsTerminalMode(true);
+    } else {
+      setTerminalData(null);
+      setIsTerminalMode(false);
+    }
+
     processContent(content, filename);
   };
 
@@ -131,36 +215,26 @@ export default function App() {
   const handleSelectCitation = (lineNum, filePrefix) => {
     if (!forensicData) return;
 
-    let targetLine = lineNum;
+    // Use centralized citation target resolution
+    const resolved = resolveCitationTarget(
+      { lineNum, filePrefix },
+      memoryManifest,
+      forensicData.lineCount
+    );
 
-    // Multi-file resolution if the rawContent contains concatenated files
-    if (filePrefix && rawContent.includes('===== FILE:')) {
-      const rawLines = rawContent.split('\n');
-      for (let i = 0; i < rawLines.length; i++) {
-        if (rawLines[i].includes('===== FILE:') && rawLines[i].toLowerCase().includes(filePrefix.toLowerCase())) {
-          targetLine = i + 1 + lineNum; // offset by header line
-          break;
-        }
-      }
-    }
+    const targetLine = resolved.targetLine;
 
-    // Check for invalid or non-existent line (spectral anomaly fallback)
-    if (targetLine < 1 || targetLine > forensicData.lineCount) {
-      const clamped = Math.max(1, Math.min(targetLine, forensicData.lineCount));
-      setHighlightedLine(clamped);
+    if (resolved.isClamped || resolved.notFound) {
       setCitationNotice({
         requested: filePrefix ? `${filePrefix}:Line ${lineNum}` : `Line ${lineNum}`,
-        clamped,
+        clamped: targetLine,
         maxLines: forensicData.lineCount,
+        file: resolved.file?.path || filePrefix || null,
       });
-      const element = document.getElementById(`evidence-line-${clamped}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      return;
+    } else {
+      setCitationNotice(null);
     }
 
-    setCitationNotice(null);
     setHighlightedLine(targetLine);
     const element = document.getElementById(`evidence-line-${targetLine}`);
     if (element) {
@@ -296,6 +370,8 @@ ${tiers.narrative || manifestationText}
         currentArchiveId={currentArchiveId}
         onSelectArchive={loadArchive}
         onCustomFileUpload={handleCustomFileUpload}
+        onFolderAnalysis={handleFolderAnalysis}
+        onTerminalImport={handleTerminalImport}
         onPasteSnippet={handlePasteSnippet}
         isCustomFile={isCustomFile}
         activeFilename={activeFilename}
@@ -313,6 +389,9 @@ ${tiers.narrative || manifestationText}
             onLineClick={handleLineClick}
             citationNotice={citationNotice}
             onDismissNotice={() => setCitationNotice(null)}
+            terminalData={terminalData}
+            isTerminalMode={isTerminalMode}
+            memoryManifest={memoryManifest}
           />
         )}
 
@@ -329,6 +408,7 @@ ${tiers.narrative || manifestationText}
           storySource={storySource}
           onSelectCitation={handleSelectCitation}
           onExportDossier={handleExportDossier}
+          forensicData={forensicData}
         />
       </main>
     </div>

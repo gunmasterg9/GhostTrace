@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isTerminalHistoryFile, analyzeTerminalHistory } from '../src/utils/terminalForensics.js';
+import { redactSensitiveData } from '../src/utils/redactor.js';
 
 test('Haunted Terminal - correctly identifies terminal history filenames and shell prompts', () => {
   assert.equal(isTerminalHistoryFile('.bash_history', ''), true);
@@ -80,3 +81,25 @@ $ exit 139
   // Exit 139 (Segmentation fault) caught
   assert.ok(forensics.exitFailures.some((e) => e.code === '139'));
 });
+
+test('Haunted Terminal - redacts credentials in terminal logs before inference payload creation', () => {
+  const terminalLogWithSecrets = `
+$ export API_KEY="sk-live-secret_key_12345"
+$ curl -H "Authorization: Bearer my_secret_token_12345" https://api.internal/v1/dump
+$ export DB_PASSWORD="SuperPassword999!"
+$ rm -rf /tmp/cache
+  `.trim();
+
+  // Test redaction of terminal text
+  const { sanitized, redactionCount } = redactSensitiveData(terminalLogWithSecrets);
+  assert.ok(redactionCount >= 2);
+  assert.ok(!sanitized.includes('my_secret_token_12345'));
+  assert.ok(!sanitized.includes('SuperPassword999!'));
+  assert.ok(sanitized.includes('REDACTED_ECTOPLASM'));
+
+  // Test that analysis operates cleanly on redacted text
+  const forensics = analyzeTerminalHistory(sanitized, 'bash_history.txt');
+  assert.equal(forensics.isTerminal, true);
+  assert.ok(forensics.dangerousCommands.some((c) => c.label.includes('Destructive Deletion')));
+});
+

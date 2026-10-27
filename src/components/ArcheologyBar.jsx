@@ -1,11 +1,14 @@
 import React, { useRef, useState } from 'react';
 import { FileCode, Upload, FolderArchive, Terminal, CheckCircle2, Files, ShieldCheck } from 'lucide-react';
 import { SAMPLE_ARCHIVES } from '../data/sampleArchives';
+import { EXPLORER_LIMITS, analyzeMemoryArchive } from '../utils/memoryExplorer';
 
 export function ArcheologyBar({
   currentArchiveId,
   onSelectArchive,
   onCustomFileUpload,
+  onFolderAnalysis,
+  onTerminalImport,
   onPasteSnippet,
   isCustomFile,
   activeFilename,
@@ -83,41 +86,68 @@ export function ArcheologyBar({
     if (!files.length) return;
 
     const eligible = files.filter((file) => !file.name.startsWith('.') && !file.name.endsWith('.lock'));
-    const allowed = /\.(rs|js|jsx|ts|tsx|py|go|cpp|c|h|java|log|txt|json|md|sh|ps1|bash_history|yml|yaml|sql|toml|ini|xml|html|css|env)$/i;
-    const candidates = eligible.filter((file) => allowed.test(file.name));
+    const candidates = eligible.filter((file) => {
+      const lower = file.name.toLowerCase();
+      return EXPLORER_LIMITS.ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext)) || lower.includes('history');
+    });
+
     if (!candidates.length) {
       setUploadError('No supported text, source-code, README, or log files found in the selected folder.');
       return;
     }
-    if (candidates.length > 30) {
-      setUploadError('Folder scan limited to 30 supported text files at a time. Select a smaller folder or subfolder.');
+
+    if (candidates.length > EXPLORER_LIMITS.MAX_FILE_COUNT) {
+      setUploadError(`Folder scan limited to ${EXPLORER_LIMITS.MAX_FILE_COUNT} supported text files at a time. Select a smaller folder or subfolder.`);
       return;
     }
+
     const totalBytes = candidates.reduce((sum, file) => sum + file.size, 0);
-    if (totalBytes > 4 * 1024 * 1024) {
-      setUploadError('Selected text files exceed the 4MB total limit. Choose a smaller folder or subfolder.');
+    if (totalBytes > EXPLORER_LIMITS.MAX_TOTAL_SIZE_BYTES) {
+      setUploadError(`Selected text files exceed the ${Math.round(EXPLORER_LIMITS.MAX_TOTAL_SIZE_BYTES / (1024 * 1024))}MB total limit. Choose a smaller folder or subfolder.`);
       return;
     }
 
     try {
-      const sections = await Promise.all(candidates.map(async (file) => {
-        if (file.size === 0) return null;
-        const content = await readTextFile(file);
-        const relative = file.webkitRelativePath || file.name;
-        return `===== FILE: ${relative} =====\n${content}`;
-      }));
-      const usable = sections.filter(Boolean);
-      if (!usable.length) {
+      const fileObjects = await Promise.all(
+        candidates.map(async (file) => {
+          if (file.size === 0) return null;
+          try {
+            const content = await readTextFile(file);
+            return {
+              name: file.name,
+              path: file.webkitRelativePath || file.name,
+              content,
+              size: file.size,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const usableFiles = fileObjects.filter(Boolean);
+      if (!usableFiles.length) {
         setUploadError('The selected folder contains no non-empty text artifacts.');
         return;
       }
-      const combined = usable.join('\n\n');
-      if (!combined.trim()) {
-        setUploadError('No readable text content was found.');
+
+      // Enforce the centralized memoryExplorer analysis policy
+      const analysisResult = analyzeMemoryArchive(usableFiles);
+
+      if (analysisResult.files.length === 0) {
+        setUploadError(analysisResult.warnings[0] || 'No eligible text files could be ingested.');
         return;
       }
+
       setUploadError(null);
-      onCustomFileUpload(`folder-excavation-${candidates.length}-files.txt`, combined);
+      if (onFolderAnalysis) {
+        onFolderAnalysis(analysisResult);
+      } else {
+        onCustomFileUpload(
+          `folder-excavation-${analysisResult.totalFiles}-files.txt`,
+          analysisResult.combinedRedacted
+        );
+      }
     } catch (error) {
       setUploadError(`Folder scan stopped safely: ${error.message}`);
     }
@@ -136,8 +166,8 @@ export function ArcheologyBar({
       setUploadError('The selected terminal history is empty.');
       return;
     }
-    if (totalBytes > 4 * 1024 * 1024) {
-      setUploadError('Terminal history exceeds the 4MB limit. Export a smaller date range or paste a focused excerpt.');
+    if (totalBytes > EXPLORER_LIMITS.MAX_TOTAL_SIZE_BYTES) {
+      setUploadError(`Terminal history exceeds the ${Math.round(EXPLORER_LIMITS.MAX_TOTAL_SIZE_BYTES / (1024 * 1024))}MB limit. Export a smaller date range or paste a focused excerpt.`);
       return;
     }
     try {
@@ -149,8 +179,13 @@ export function ArcheologyBar({
       const combined = sections.filter(Boolean).join('\n\n');
       if (!combined.trim()) throw new Error('No non-empty terminal text found.');
       setUploadError(null);
-      onCustomFileUpload(`terminal-history-${files.length}-files.txt`,
-        `SOURCE TYPE: USER-SELECTED TERMINAL HISTORY / LOGS (READ-ONLY IMPORT)\nNo commands were executed. Analyze this imported text only.\n\n${combined}`);
+      const filename = `terminal-history-${files.length}-files.txt`;
+      const fullText = `SOURCE TYPE: USER-SELECTED TERMINAL HISTORY / LOGS (READ-ONLY INERT TEXT IMPORT)\nNo commands were executed. Analyze this imported text only.\n\n${combined}`;
+      if (onTerminalImport) {
+        onTerminalImport(filename, fullText);
+      } else {
+        onCustomFileUpload(filename, fullText);
+      }
     } catch (error) {
       setUploadError(`Terminal import stopped safely: ${error.message}`);
     }
@@ -289,8 +324,8 @@ export function ArcheologyBar({
       </div>
       <div className="max-w-7xl mx-auto mt-2 flex flex-wrap items-center gap-2 text-[10px] font-fira text-slate-500">
         <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-emerald-500" /> Read-only imports</span>
-        <span>• Folder scan: up to 30 text files / 4MB total</span>
-        <span>• Terminal history is analyzed as text; commands are never executed</span>
+        <span>• Folder scan: up to {EXPLORER_LIMITS.MAX_FILE_COUNT} text files / {Math.round(EXPLORER_LIMITS.MAX_TOTAL_SIZE_BYTES / (1024 * 1024))}MB total ({Math.round(EXPLORER_LIMITS.MAX_SINGLE_FILE_SIZE / 1024)}KB per file)</span>
+        <span>• Terminal history is analyzed as inert text; commands are never executed</span>
       </div>
 
       {/* Paste Modal */}

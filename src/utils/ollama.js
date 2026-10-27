@@ -234,8 +234,8 @@ export async function simulateGhostStream({ persona, forensics, onToken, signal 
   for (let pIdx = 0; pIdx < outputLines.length; pIdx++) {
     const paragraph = outputLines[pIdx];
     if (!paragraph) {
-      fullText += '\\n';
-      onToken(fullText, '\\n');
+      fullText += '\n';
+      onToken(fullText, '\n');
       continue;
     }
     const words = paragraph.split(' ');

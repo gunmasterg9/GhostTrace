@@ -25,11 +25,22 @@ export function parseManifestationTiers(manifestationText, forensicData) {
     return raw.replace(headerPattern, '').trim();
   };
 
+  const parserEvidence = formatGroundTruthEvidence(forensicData);
+
   if (evidenceMatch || interpretationMatch || narrativeMatch) {
+    const parsedInterpretation = cleanSection(
+      interpretationMatch ? interpretationMatch[0] : '',
+      /^#{1,4}\s*.*(?:AI|FORENSIC) INTERPRETATION.*$/im
+    );
+    const parsedNarrative = cleanSection(
+      narrativeMatch ? narrativeMatch[0] : '',
+      /^#{1,4}\s*.*(?:SPECTRAL MANIFESTATION|FICTIONAL NARRATIVE).*$/im
+    );
+
     return {
-      evidenceText: cleanSection(evidenceMatch ? evidenceMatch[0] : '', /^#{1,4}\s*.*VERIFIED EVIDENCE.*$/im),
-      interpretation: cleanSection(interpretationMatch ? interpretationMatch[0] : '', /^#{1,4}\s*.*(?:AI|FORENSIC) INTERPRETATION.*$/im),
-      narrative: cleanSection(narrativeMatch ? narrativeMatch[0] : '', /^#{1,4}\s*.*(?:SPECTRAL MANIFESTATION|FICTIONAL NARRATIVE).*$/im),
+      evidenceText: parserEvidence, // Ground truth is strictly derived from parser facts
+      interpretation: parsedInterpretation || generateBaselineForensicDeduction(forensicData),
+      narrative: parsedNarrative || manifestationText.trim(),
       hasStructuredTiers: true,
       raw: manifestationText,
     };
@@ -39,7 +50,7 @@ export function parseManifestationTiers(manifestationText, forensicData) {
   // The full text is treated as the Spectral Narrative,
   // while verified facts are grounded directly in the forensic autopsy data.
   return {
-    evidenceText: formatGroundTruthEvidence(forensicData),
+    evidenceText: parserEvidence,
     interpretation: generateBaselineForensicDeduction(forensicData),
     narrative: manifestationText.trim(),
     hasStructuredTiers: false,

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Sparkles, StopCircle, Download, Copy, Check, Radio, BookOpen } from 'lucide-react';
 import { GHOST_PERSONAS } from '../data/personas';
+import { parseManifestationTiers } from '../utils/manifestationParser';
 
 export function ManifestationPanel({
   selectedPersona,
@@ -14,6 +15,7 @@ export function ManifestationPanel({
   storySource,
   onSelectCitation,
   onExportDossier,
+  forensicData,
 }) {
   const terminalEndRef = useRef(null);
   const [copied, setCopied] = React.useState(false);
@@ -74,13 +76,16 @@ export function ManifestationPanel({
 
   const renderNarrative = (text) => {
     if (!text) return null;
-    const labels = [
+    const tiers = parseManifestationTiers(text, forensicData);
+
+    const sections = [
       {
         key: 'VERIFIED EVIDENCE',
         title: '1. Verified Evidence',
-        subtitle: 'Source-derived ground truth facts • Raw syntax & signatures',
+        subtitle: 'Source-derived ground truth facts • Deterministic parser output',
         tone: 'emerald',
         icon: '📜',
+        body: tiers.evidenceText,
       },
       {
         key: 'AI INTERPRETATION',
@@ -88,51 +93,38 @@ export function ManifestationPanel({
         subtitle: 'Probabilistic AI deduction • Pattern-based, uncertain analysis',
         tone: 'amber',
         icon: '🔬',
+        body: tiers.interpretation || (isGenerating ? 'Synthesizing technical deductions…' : 'No interpretation generated.'),
       },
       {
-        key: 'FICTIONAL NARRATIVE',
+        key: 'SPECTRAL MANIFESTATION',
         title: '3. Spectral Manifestation',
         subtitle: 'Explicitly creative fiction • Gothic horror storytelling',
         tone: 'purple',
         icon: '🕯️',
+        body: tiers.narrative || (isGenerating ? 'Channeling spectral narrative…' : text),
       },
     ];
-    const headingPattern = /^\s*#{0,3}\s*(VERIFIED EVIDENCE|AI INTERPRETATION|FICTIONAL NARRATIVE)\s*:?\s*$/gim;
-    const matches = [...text.matchAll(headingPattern)];
-    if (matches.length < 3) {
-      return (
-        <div className="text-xs sm:text-sm leading-relaxed text-slate-200 whitespace-pre-wrap font-fira tracking-wide">
-          {renderInteractiveStory(text)}
-          {isGenerating && <span className="terminal-cursor" />}
-        </div>
-      );
-    }
-    const sections = matches.map((match, index) => ({
-      key: match[1].toUpperCase(),
-      body: text.slice(match.index + match[0].length, index + 1 < matches.length ? matches[index + 1].index : text.length).trim(),
-    }));
+
     return (
       <div className="space-y-4">
         {sections.map((section) => {
-          const label = labels.find((item) => item.key === section.key);
-          if (!label) return null;
-          const toneClasses = label.tone === 'emerald'
+          const toneClasses = section.tone === 'emerald'
             ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300'
-            : label.tone === 'amber'
+            : section.tone === 'amber'
               ? 'border-amber-500/40 bg-amber-950/20 text-amber-200'
               : 'border-purple-500/40 bg-purple-950/20 text-purple-200';
           return (
             <section key={section.key} className={`rounded-lg border p-3.5 ${toneClasses}`}>
               <div className="flex flex-wrap items-center justify-between gap-1 border-b border-white/10 pb-2 mb-2.5">
                 <h4 className="text-xs font-bold tracking-wider uppercase font-cinzel text-white flex items-center gap-1.5">
-                  <span>{label.icon}</span> {label.title}
+                  <span>{section.icon}</span> {section.title}
                 </h4>
                 <span className="text-[10px] font-fira text-slate-400 italic">
-                  {label.subtitle}
+                  {section.subtitle}
                 </span>
               </div>
               <div className="text-xs sm:text-sm leading-relaxed text-slate-200 whitespace-pre-wrap font-fira">
-                {renderInteractiveStory(section.body || (isGenerating ? 'The signal is forming…' : 'No content supplied for this section.'))}
+                {renderInteractiveStory(section.body)}
               </div>
             </section>
           );

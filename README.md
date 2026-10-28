@@ -1,10 +1,15 @@
-# 👻 GhostTrace AI: The Ghost That Remembers
+# 👻 GhostTrace AI: The Ghost That Remembers (Release Candidate v1.0.0-rc.1)
 
 > *"The machine remembers. Now it has a story to tell."*
 
 **GhostTrace AI** is a local-first digital archaeology experience that turns forgotten source code, terminal crash logs, abandoned TODOs, and software errors into eerie, interactive, evidence-based ghost stories.
 
 Powered by open-weight AI (**Gemma** running locally via **Ollama**), GhostTrace bridges forensic ground-truth and spectral fiction—keeping selected artifacts and inference on your machine. The app no longer imports Google Fonts from the internet.
+
+---
+
+> [!IMPORTANT]
+> **Security & Privacy Advisory:** While `npm audit` reports 0 known package vulnerabilities, automated dependency auditing is not a substitute for a full application security review. GhostTrace's client-side Redaction Shield strips known credential formats (OpenAI/GitHub keys, JWTs, Bearer tokens, private keys, database connection strings, and local directory paths) via deterministic heuristic regexes. However, custom-formatted, obfuscated, or base64-encoded secrets may evade pattern matching. **Never upload or paste files containing active production credentials, root keys, or sensitive infrastructure passwords.**
 
 ---
 
@@ -121,33 +126,46 @@ GhostTrace/
 │   │   └── terminalForensics.js   # Inert text-only terminal history & failure loop analyzer
 │   ├── App.jsx                    # Core application orchestrator, navigation & dossier exporter
 │   └── index.css                  # Cyber-gothic accessible dark design system
-├── tests/                         # Node.js native automated test suite (18 tests)
+├── tests/                         # Node.js native automated test suite (36 tests)
 │   ├── evidence_vs_imagination.test.js
 │   ├── haunted_terminal.test.js
 │   ├── memory_explorer.test.js
-│   └── redactor.test.js
+│   ├── redactor.test.js
+│   ├── ollama_reliability.test.js
+│   └── audit_reliability_deep.test.js
 ├── vite.config.js                 # Vite dev server with /ollama reverse proxy
 └── package.json
 ```
 
 ---
 
-## 🧪 Automated Test Suite
+## 🧪 Automated Test Suite & Release Verification
 
 GhostTrace includes a complete native automated test suite with zero extra test-runner dependencies:
 
 ```bash
-npm test
+# On Windows PowerShell:
+npm.cmd test
+npm.cmd run lint
+npm.cmd run build
+npm.cmd run preview
 ```
 
-Verifies all 18 test cases across the core pillars:
+Verifies all **36 test cases** across the core pillars:
 - **Evidence vs. Imagination:** Validates epistemic tier separation, fallback handling, multi-file citation regex, citation boundary clamping, and strict enforcement of parser-derived ground-truth over model hallucinations.
+- **Ollama Reliability & Chunk Buffering:** Validates split JSONL records across network stream chunks, final unclosed buffered records, timeout handling, missing-model errors (404), empty streams, user abort, custom endpoints, and duplicate-fallback prevention.
 - **Haunted Terminal:** Validates inert text parsing without shell execution, detection of dangerous commands (`rm -rf`, `drop database`, `dd`, `git reset --hard`), failure exit codes (`137`, `139`), command repetition loops, and client-side credential redaction before inference.
 - **Digital Memory Explorer:** Validates file-count limits (max 30), total size bounds (2MB aggregate, 500KB per file), binary file rejection (null-byte inspection), line-level manifest arithmetic, and pre-inference privacy redaction.
-- **Multi-File Citations:** Validates `resolveCitationTarget()` mapping for relative paths, first and later files, duplicate basenames, Windows/Unix path separators, line 1, last line, out-of-bounds line clamping, and preserving combined artifact lines when no file prefix is present.
-- **Redaction Shield:** Validates client-side sanitization of API keys, passwords, Bearer tokens, and Windows/Unix file paths.
+- **Multi-File Citations & Unverified Warnings:** Validates `resolveCitationTarget()` mapping for relative paths, first and later files, duplicate basenames, Windows/Unix path separators, line 1, last line, out-of-bounds line clamping, and explicit `Unverified Citation Warning` generation when citations point to missing files or out-of-bounds lines.
+- **Redaction Shield:** Validates client-side sanitization of API keys, passwords, Bearer tokens, OpenAI keys, GitHub tokens, database connection URIs, private keys, JWTs, and Windows/Unix file paths, ensuring zero secret fragments appear in metadata previews.
 
+---
 
+## ⚠️ Known Issues & Operational Guidance
+
+1. **Cold LLM Weights**: Loading 7B+ open-weight models cold into VRAM on lower-tier hardware may take 20–40 seconds. GhostTrace employs a 60-second inactivity timer to prevent premature aborts while tokens are loading.
+2. **Regex-Based Redaction Boundaries**: Heuristic pattern matching detects standard token prefixes and assignments. Highly obfuscated or proprietary credential strings may evade detection; do not load active production credentials.
+3. **Local-First Model Connectivity**: To enable local inference, ensure Ollama is running (`ollama serve`). If Ollama is offline or unavailable, GhostTrace automatically switches to its grounded offline simulation engine with transparent UI indicators and a one-click Retry button.
 
 ---
 

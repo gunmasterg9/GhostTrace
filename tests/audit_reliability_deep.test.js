@@ -155,3 +155,44 @@ $ chmod -R 777 /etc/ssl
   assert.ok(termData.dangerousCommands.some((c) => c.label.includes('Database Purge')));
   assert.ok(termData.dangerousCommands.some((c) => c.label.includes('Raw Disk Write')));
 });
+
+test('Citations - detects out-of-bounds lines and missing files without claiming verified ground truth', () => {
+  const dummyManifest = [
+    {
+      path: 'src/auth.js',
+      filename: 'auth.js',
+      contentStartLine: 1,
+      contentEndLine: 50,
+      lineCount: 50,
+    },
+    {
+      path: 'src/db.js',
+      filename: 'db.js',
+      contentStartLine: 51,
+      contentEndLine: 120,
+      lineCount: 70,
+    },
+  ];
+
+  // 1. Valid multi-file citation
+  const valid = resolveCitationTarget({ lineNum: 20, filePrefix: 'src/auth.js' }, dummyManifest, 120);
+  assert.equal(valid.targetLine, 20);
+  assert.equal(valid.notFound, false);
+  assert.equal(valid.isClamped, false);
+
+  // 2. Out of bounds line in existing file
+  const outOfBounds = resolveCitationTarget({ lineNum: 999, filePrefix: 'src/auth.js' }, dummyManifest, 120);
+  assert.equal(outOfBounds.targetLine, 50); // clamped to file end
+  assert.equal(outOfBounds.isClamped, true);
+  assert.equal(outOfBounds.notFound, false);
+
+  // 3. File prefix not found in manifest
+  const missingFile = resolveCitationTarget({ lineNum: 10, filePrefix: 'missing_worker.rs' }, dummyManifest, 120);
+  assert.equal(missingFile.notFound, true);
+  assert.equal(missingFile.originalPrefix, 'missing_worker.rs');
+
+  // 4. Standalone citation out of overall bounds
+  const standaloneOver = resolveCitationTarget({ lineNum: 500 }, dummyManifest, 120);
+  assert.equal(standaloneOver.targetLine, 120);
+  assert.equal(standaloneOver.isClamped, true);
+});

@@ -353,3 +353,85 @@ test('Ollama Reliability - simulation fallback produces authentic 3-tier structu
   assert.ok(parsed.interpretation.includes('pattern-based interpretation'));
   assert.ok(parsed.narrative.includes('Epitaph'));
 });
+
+test('Ollama Reliability - split JSONL records and final unclosed buffer reassemble cleanly', async () => {
+  const originalFetch = globalThis.fetch;
+  const chunks = [
+    '{"response": "## VERIFIED EVI',
+    'DENCE\\n- [Line 12] Crash\\n"}\n{"response": "',
+    '## AI INTERPRETATION\\n- Hypo',
+    'thesis confirmed.\\n"}\n{"response": "## FICTIONAL NARRATIVE\\nCold specter."}',
+  ];
+
+  let readIdx = 0;
+  const mockStream = {
+    getReader() {
+      return {
+        async read() {
+          if (readIdx < chunks.length) {
+            const encoder = new TextEncoder();
+            return { done: false, value: encoder.encode(chunks[readIdx++]) };
+          }
+          return { done: true, value: undefined };
+        },
+      };
+    },
+  };
+
+  globalThis.fetch = async () => ({
+    ok: true,
+    body: mockStream,
+  });
+
+  try {
+    const result = await streamGhostStory({
+      endpoint: '/ollama',
+      model: 'gemma4:e4b',
+      persona: dummyPersona,
+      codeSnippet: 'int main() { return 0; }',
+      forensics: dummyForensics,
+      onToken: () => {},
+    });
+
+    assert.ok(result.includes('## VERIFIED EVIDENCE'));
+    assert.ok(result.includes('[Line 12] Crash'));
+    assert.ok(result.includes('## AI INTERPRETATION'));
+    assert.ok(result.includes('Hypothesis confirmed.'));
+    assert.ok(result.includes('## FICTIONAL NARRATIVE'));
+    assert.ok(result.includes('Cold specter.'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Ollama Reliability - prevents duplicate fallback execution on streaming failures', async () => {
+  const originalFetch = globalThis.fetch;
+  let errorCount = 0;
+  let fallbackCount = 0;
+
+  globalThis.fetch = async () => {
+    throw new Error('Connection failed');
+  };
+
+  try {
+    await streamGhostStory({
+      endpoint: '/ollama',
+      model: 'gemma4:e4b',
+      persona: dummyPersona,
+      codeSnippet: 'int main() { return 0; }',
+      forensics: dummyForensics,
+      onError: () => {
+        errorCount++;
+      },
+      onSourceChange: (type) => {
+        if (type === 'simulation') fallbackCount++;
+      },
+      onToken: () => {},
+    });
+
+    assert.equal(errorCount, 1);
+    assert.equal(fallbackCount, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

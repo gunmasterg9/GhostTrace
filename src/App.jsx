@@ -267,15 +267,18 @@ export default function App() {
         clamped: targetLine,
         maxLines: forensicData.lineCount,
         file: resolved.file?.path || filePrefix || null,
+        notFound: resolved.notFound,
+        isClamped: resolved.isClamped,
       });
+      // Do not silently mark invalid or fabricated citations as verified source lines
+      setHighlightedLine(null);
     } else {
       setCitationNotice(null);
-    }
-
-    setHighlightedLine(targetLine);
-    const element = document.getElementById(`evidence-line-${targetLine}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedLine(targetLine);
+      const element = document.getElementById(`evidence-line-${targetLine}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   };
 

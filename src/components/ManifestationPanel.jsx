@@ -194,7 +194,13 @@ export function ManifestationPanel({
             Investigation Results
           </h2>
           <span className="text-[11px] font-fira text-purple-300 px-2 py-0.5 rounded bg-purple-950/40 border border-purple-500/30">
-            {isOllamaOnline ? activeModel : 'Offline Simulation Engine'}
+            {storySource
+              ? storySource.type === 'ollama'
+                ? `🟢 Ollama: ${storySource.model}`
+                : '🟡 Offline Simulation Engine (Fallback)'
+              : isOllamaOnline
+              ? `Ready: ${activeModel}`
+              : 'Offline Simulation Engine'}
           </span>
         </div>
 
@@ -287,9 +293,9 @@ export function ManifestationPanel({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block" />
             <span>
-              {isOllamaOnline
-                ? `Channeling Gemma (${activeModel}) via Ollama…`
-                : 'Synthesizing forensic autopsy via offline simulation engine…'}
+              {storySource?.type === 'simulation' || (!isOllamaOnline && !storySource)
+                ? 'Synthesizing forensic autopsy via offline simulation engine…'
+                : `Channeling Gemma (${activeModel}) via Ollama…`}
             </span>
           </div>
           <span className="text-[10px] text-slate-400">Streaming tokens locally</span>

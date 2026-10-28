@@ -65,7 +65,7 @@ export async function streamGhostStory({
   onSourceChange,
   onError,
   signal,
-  timeoutMs = 30000,
+  timeoutMs = 60000,
 }) {
   const systemPrompt = persona.systemInstruction;
   
@@ -124,6 +124,15 @@ If a section has no supporting material, say so instead of inventing evidence.
   const fetchController = new AbortController();
   let timeoutId = null;
 
+  const resetInactivityTimer = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (timeoutMs > 0) {
+      timeoutId = setTimeout(() => {
+        fetchController.abort(new Error(`Ollama request stalled/timed out after ${Math.round(timeoutMs / 1000)}s of inactivity`));
+      }, timeoutMs);
+    }
+  };
+
   const onExternalAbort = () => {
     fetchController.abort(signal?.reason || new Error('Aborted by user'));
   };
@@ -135,11 +144,7 @@ If a section has no supporting material, say so instead of inventing evidence.
     signal.addEventListener('abort', onExternalAbort, { once: true });
   }
 
-  if (timeoutMs > 0) {
-    timeoutId = setTimeout(() => {
-      fetchController.abort(new Error(`Ollama request timed out after ${Math.round(timeoutMs / 1000)}s`));
-    }, timeoutMs);
-  }
+  resetInactivityTimer();
 
   try {
     const res = await fetch(`${endpoint || OLLAMA_PROXIED_BASE}/api/generate`, {
@@ -177,17 +182,49 @@ If a section has no supporting material, say so instead of inventing evidence.
     const decoder = new TextDecoder();
     let accumulated = '';
     let tokenCount = 0;
+    let buffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      resetInactivityTimer();
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n').filter(Boolean);
+      if (done) {
+        // Process final buffered record if present without trailing newline
+        const finalTrimmed = buffer.trim();
+        if (finalTrimmed) {
+          try {
+            const parsed = JSON.parse(finalTrimmed);
+            if (parsed.error) {
+              throw new Error(`Ollama stream error: ${parsed.error}`);
+            }
+            if (parsed.response) {
+              accumulated += parsed.response;
+              onToken(accumulated, parsed.response);
+              tokenCount++;
+              if (tokenCount % 3 === 0) {
+                spectralAudio.playKeyClick();
+              }
+            }
+          } catch (streamErr) {
+            if (streamErr?.message && streamErr.message.startsWith('Ollama stream error:')) {
+              throw streamErr;
+            }
+            // ignore non-fatal trailing parse errors if stream completed
+          }
+        }
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      // Keep any trailing incomplete record in the buffer for the next chunk
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
         try {
-          const parsed = JSON.parse(line);
+          const parsed = JSON.parse(trimmed);
           if (parsed.error) {
             throw new Error(`Ollama stream error: ${parsed.error}`);
           }
@@ -203,7 +240,7 @@ If a section has no supporting material, say so instead of inventing evidence.
           if (streamErr?.message && streamErr.message.startsWith('Ollama stream error:')) {
             throw streamErr;
           }
-          // ignore partial json chunk parsing errors
+          // ignore partial or malformed intermediate lines
         }
       }
     }

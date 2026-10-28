@@ -172,11 +172,27 @@ export function EvidencePanel({
 
       {/* Citation Anomaly / Out-of-Bounds Fallback Alert */}
       {citationNotice && (
-        <div className="px-3.5 py-2 bg-amber-950/50 border-b border-amber-500/40 flex items-center justify-between text-xs font-fira text-amber-300 animate-pulse">
+        <div className="px-3.5 py-2.5 bg-amber-950/70 border-b border-amber-500/50 flex items-center justify-between text-xs font-fira text-amber-200">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              <strong>Citation Note:</strong> Cited Line {citationNotice.requested} exceeds artifact bounds (1-{citationNotice.maxLines}). Adjusted to Line {citationNotice.clamped}.
+              {citationNotice.notFound ? (
+                <span>
+                  <strong className="text-amber-300">Unverified Citation Warning:</strong> The file{' '}
+                  <code className="text-amber-200 bg-black/40 px-1 py-0.5 rounded border border-amber-500/30">
+                    {citationNotice.file}
+                  </code>{' '}
+                  was not found in the artifact manifest. This citation cannot be verified against source evidence.
+                </span>
+              ) : (
+                <span>
+                  <strong className="text-amber-300">Unverified Citation Warning:</strong> Cited line{' '}
+                  <code className="text-amber-200 bg-black/40 px-1 py-0.5 rounded border border-amber-500/30">
+                    {citationNotice.requested}
+                  </code>{' '}
+                  is out of bounds (valid range: 1–{citationNotice.maxLines}). Cannot be verified as genuine source evidence.
+                </span>
+              )}
             </span>
           </div>
           <button

@@ -1,5 +1,13 @@
 // Privacy-First Redactor for GhostTrace AI
 // Strips credentials, API keys, JWTs, and local sensitive data locally on the client
+//
+// KNOWN LIMITATIONS & THREAT MODEL:
+// - Heuristic regex detection targets established credential patterns (API keys, JWTs,
+//   OpenAI/GitHub tokens, AWS access keys, private keys, database connection strings,
+//   Bearer headers, and local user home paths).
+// - It cannot guarantee detection of arbitrary high-entropy custom secrets, obfuscated
+//   or base64/hex-encoded payloads, or non-standard proprietary variables.
+// - Users must never feed live root production infrastructure credentials into any AI tool.
 
 const PATTERNS = [
   { name: 'API Key / Password', regex: /(?:[a-zA-Z0-9_-]*(?:api[_-]?key|secret|token|password|passwd|pwd|auth[_-]?token|credential)[a-zA-Z0-9_-]*)['"]?\s*[:=]\s*['"]?([^\s'",;\r\n]{4,})['"]?/gi, redactGroup: 1 },
@@ -28,7 +36,8 @@ export function redactSensitiveData(rawContent) {
   for (const { name, regex, redactGroup } of PATTERNS) {
     sanitized = sanitized.replace(regex, (match, group1) => {
       totalCount++;
-      redactions.push({ type: name, preview: match.slice(0, 12) + '...' });
+      // Safe preview: NEVER include raw matched secret fragments in metadata
+      redactions.push({ type: name, preview: '[REDACTED]' });
       if (redactGroup && group1) {
         return match.replace(group1, '⟦REDACTED_ECTOPLASM⟧');
       }
@@ -39,6 +48,6 @@ export function redactSensitiveData(rawContent) {
   return {
     sanitized,
     redactionCount: totalCount,
-    redactions: redactions.slice(0, 10), // sample of caught items
+    redactions: redactions.slice(0, 10), // safe sample of caught categories
   };
 }

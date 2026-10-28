@@ -2,9 +2,12 @@
 // Strips credentials, API keys, JWTs, and local sensitive data locally on the client
 
 const PATTERNS = [
-  { name: 'API Key / Password', regex: /(?:api[_-]?key|secret|token|password|passwd|pwd|auth[_-]?token)['"]?\s*[:=]\s*['"]?([^\s'",;\r\n]{4,})['"]?/gi, redactGroup: 1 },
+  { name: 'API Key / Password', regex: /(?:[a-zA-Z0-9_-]*(?:api[_-]?key|secret|token|password|passwd|pwd|auth[_-]?token|credential)[a-zA-Z0-9_-]*)['"]?\s*[:=]\s*['"]?([^\s'",;\r\n]{4,})['"]?/gi, redactGroup: 1 },
+  { name: 'OpenAI / Model Key', regex: /\b(sk-[a-zA-Z0-9_-]{20,})\b/g },
+  { name: 'GitHub Token', regex: /\b(gh[pousr]_[A-Za-z0-9_]{20,})\b/g },
+  { name: 'Database URI', regex: /\b(?:mongodb(?:\+srv)?|postgres(?:ql)?|mysql|redis):\/\/[^\s'",;\r\n]+/gi },
   { name: 'AWS Access Key', regex: /(A3T[A-Z0-9]|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})/g },
-  { name: 'Private Key', regex: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC )?PRIVATE KEY-----/g },
+  { name: 'Private Key', regex: /-----BEGIN (?:[A-Z0-9_-]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z0-9_-]+ )?PRIVATE KEY-----/g },
   { name: 'JWT Token', regex: /eyJ[A-Za-z0-9-_]+\.eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+/g },
   { name: 'Email Address', regex: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g },
   { name: 'IPv4 Address (Private)', regex: /\b(?:192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})\b/g },

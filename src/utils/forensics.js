@@ -21,7 +21,7 @@ export function analyzeEvidence(content, filename = 'unknown_artifact') {
   const timestamps = [];
 
   const TODO_REGEX = /(?:\/\/|#|\/\*|\*|--)\s*(TODO|FIXME|HACK|BUG|XXX|OPTIMIZE|TEMP|WARNING)\b[:\s]*(.*)/i;
-  const PANIC_REGEX = /\b(panic!|segfault|Segmentation fault|UnhandledPromiseRejection|NullPointerException|OOMKilled|SIGSEGV|SIGKILL|core dumped|Fatal error|abort\(\)|CRITICAL)\b/i;
+  const PANIC_REGEX = /\b(panic!|segfault|Segmentation fault|UnhandledPromiseRejection|NullPointerException|OOMKilled|SIGSEGV|SIGKILL|core dumped|Fatal error|abort\(\)|CRITICAL)(?=[^a-zA-Z0-9_]|$)/i;
   const TIMESTAMP_REGEX = /\b(0[0-5]:[0-5][0-9](?::[0-5][0-9])?|[1-4]:[0-5][0-9]\s*(?:AM|am)|(?:0[1-4]|00):[0-5][0-9])\b/;
   const ANCIENT_YEAR_REGEX = /\b(201[4-9]|202[0-3])\b/;
 

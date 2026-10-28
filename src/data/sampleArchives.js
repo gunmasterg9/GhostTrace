@@ -132,4 +132,35 @@ class SessionEntity:
 GLOBAL_FALLBACK_SESSION = SessionEntity("SYSTEM_DAEMON_ROOT")
 `,
   },
+  {
+    id: 'terminal_incident',
+    title: 'The 03:15 AM Root Incident (.bash_history)',
+    subtitle: 'Unfiltered command stream of a catastrophic late-night outage',
+    category: 'Terminal Logs',
+    filename: '.bash_history',
+    defaultPersona: 'panic_core',
+    content: `#1635649339
+git status
+#1635649350
+git commit -m "hotfix: force bypass mutex locks"
+#1635649360
+git push origin feature/zero-knowledge-v2 --force
+#1635649370
+curl -X POST https://api.internal-vault.corp/v1/auth -H "Authorization: Bearer dev-secret-token-999"
+#1635649380
+sudo kill -9 41882
+#1635649390
+psql -U postgres -d production_db -c "DROP DATABASE staging_vault;"
+#1635649400
+rm -rf /var/cache/app/*
+#1635649410
+exit 137
+#1635649420
+systemctl restart vault-service
+#1635649430
+systemctl restart vault-service
+#1635649440
+systemctl restart vault-service
+`,
+  },
 ];

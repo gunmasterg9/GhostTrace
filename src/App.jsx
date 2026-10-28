@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
+import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-import { ArcheologyBar } from './components/ArcheologyBar';
+import { Dashboard } from './components/Dashboard';
 import { EvidencePanel } from './components/EvidencePanel';
 import { ManifestationPanel } from './components/ManifestationPanel';
+import { TerminalPanel } from './components/TerminalPanel';
+import { SettingsPanel } from './components/SettingsPanel';
+import { PrivacyModal } from './components/PrivacyModal';
+import { PasteModal } from './components/PasteModal';
+
 import { SAMPLE_ARCHIVES } from './data/sampleArchives';
 import { GHOST_PERSONAS } from './data/personas';
 import { redactSensitiveData } from './utils/redactor';
@@ -20,6 +26,11 @@ const initialForensics = analyzeEvidence(initialRedacted.sanitized, initialArchi
 const initialPersona = GHOST_PERSONAS.find((item) => item.id === initialArchive.defaultPersona) || GHOST_PERSONAS[0];
 
 export default function App() {
+  // Navigation & Workflow state
+  const [activeNav, setActiveNav] = useState('dashboard'); // 'dashboard' | 'memory' | 'terminal' | 'results' | 'settings'
+  const [currentStep, setCurrentStep] = useState(1); // 1: Select -> 2: Privacy -> 3: Investigate -> 4: Evidence -> 5: Export
+
+  // Current artifact state
   const [currentArchiveId, setCurrentArchiveId] = useState(initialArchive.id);
   const [activeFilename, setActiveFilename] = useState(initialArchive.filename);
   const [rawContent, setRawContent] = useState(initialArchive.content);
@@ -29,23 +40,38 @@ export default function App() {
   const [forensicData, setForensicData] = useState(initialForensics);
   const [selectedPersona, setSelectedPersona] = useState(initialPersona);
 
+  // Ollama & Model state
   const [ollamaStatus, setOllamaStatus] = useState({ online: false, models: [], activeModel: 'gemma4:e4b', isGemma: false });
   const [selectedModel, setSelectedModel] = useState('gemma4:e4b');
 
+  // Display & Audio preferences
   const [isAudioOn, setIsAudioOn] = useState(false);
-  const [isCrtOn, setIsCrtOn] = useState(true);
+  const [isCrtOn, setIsCrtOn] = useState(false); // Optional setting rather than mandatory distraction
+  const [fontSize, setFontSize] = useState('normal'); // 'compact' | 'normal' | 'large'
+  const [layoutMode, setLayoutMode] = useState('split'); // 'split' | 'file-only' | 'results-only'
 
+  // Sidebar responsive state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Modals state
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  // Inference state
   const [isGenerating, setIsGenerating] = useState(false);
   const [manifestationText, setManifestationText] = useState('');
   const [highlightedLine, setHighlightedLine] = useState(null);
   const [storySource, setStorySource] = useState(null);
   const [citationNotice, setCitationNotice] = useState(null);
+  const [inferenceError, setInferenceError] = useState(null);
 
-  // Explicit Terminal Forensics State
+  // Terminal Forensics State
   const [terminalData, setTerminalData] = useState(null);
   const [isTerminalMode, setIsTerminalMode] = useState(false);
 
-  // Digital Memory Explorer Line Manifest
+  // Multi-file memory manifest
   const [memoryManifest, setMemoryManifest] = useState([]);
 
   const abortControllerRef = useRef(null);
@@ -70,7 +96,9 @@ export default function App() {
     setHighlightedLine(null);
     setStorySource(null);
     setCitationNotice(null);
+    setInferenceError(null);
     setMemoryManifest([]);
+    setUploadError(null);
 
     processContent(archive.content, archive.filename);
 
@@ -87,6 +115,8 @@ export default function App() {
       const p = GHOST_PERSONAS.find((item) => item.id === archive.defaultPersona);
       if (p) setSelectedPersona(p);
     }
+
+    setCurrentStep(2);
   };
 
   const checkOllama = async () => {
@@ -97,7 +127,6 @@ export default function App() {
     }
   };
 
-  // Check Ollama status on mount
   useEffect(() => {
     let isMounted = true;
     checkOllamaStatus().then((status) => {
@@ -120,7 +149,9 @@ export default function App() {
     setHighlightedLine(null);
     setStorySource(null);
     setCitationNotice(null);
+    setInferenceError(null);
     setMemoryManifest([]);
+    setUploadError(null);
 
     if (isTerminalHistoryFile(filename, content)) {
       const term = analyzeTerminalHistory(content, filename);
@@ -132,6 +163,7 @@ export default function App() {
     }
 
     processContent(content, filename);
+    setCurrentStep(2);
   };
 
   const handleFolderAnalysis = (analysisResult) => {
@@ -142,13 +174,12 @@ export default function App() {
     setHighlightedLine(null);
     setStorySource(null);
     setCitationNotice(null);
+    setInferenceError(null);
     setIsTerminalMode(false);
     setTerminalData(null);
+    setUploadError(null);
 
-    // Save the line-level file manifest for file-relative citation resolution
     setMemoryManifest(analysisResult.manifest || []);
-
-    // Set combined artifact; pre-redacted content is used for forensics and model payload
     setRawContent(analysisResult.combinedArtifact);
     setRedactedData({
       sanitized: analysisResult.combinedRedacted,
@@ -158,6 +189,7 @@ export default function App() {
 
     const forensics = analyzeEvidence(analysisResult.combinedRedacted, filename);
     setForensicData(forensics);
+    setCurrentStep(2);
   };
 
   const handleTerminalImport = (filename, content) => {
@@ -167,14 +199,17 @@ export default function App() {
     setHighlightedLine(null);
     setStorySource(null);
     setCitationNotice(null);
+    setInferenceError(null);
     setMemoryManifest([]);
+    setUploadError(null);
 
-    // Parse strictly as inert text without executing commands
+    // Guaranteed inert text parsing
     const term = analyzeTerminalHistory(content, filename);
     setTerminalData(term);
     setIsTerminalMode(true);
 
     processContent(content, filename);
+    setCurrentStep(2);
   };
 
   const handlePasteSnippet = (filename, content) => {
@@ -184,7 +219,9 @@ export default function App() {
     setHighlightedLine(null);
     setStorySource(null);
     setCitationNotice(null);
+    setInferenceError(null);
     setMemoryManifest([]);
+    setUploadError(null);
 
     if (isTerminalHistoryFile(filename, content)) {
       const term = analyzeTerminalHistory(content, filename);
@@ -196,6 +233,7 @@ export default function App() {
     }
 
     processContent(content, filename);
+    setCurrentStep(2);
   };
 
   const handleToggleAudio = () => {
@@ -215,7 +253,6 @@ export default function App() {
   const handleSelectCitation = (lineNum, filePrefix) => {
     if (!forensicData) return;
 
-    // Use centralized citation target resolution
     const resolved = resolveCitationTarget(
       { lineNum, filePrefix },
       memoryManifest,
@@ -242,7 +279,7 @@ export default function App() {
     }
   };
 
-  const handleStartSéance = async () => {
+  const handleStartInvestigation = async () => {
     if (isGenerating || !forensicData) return;
 
     spectralAudio.playSéanceChime();
@@ -250,6 +287,8 @@ export default function App() {
     setManifestationText('');
     setStorySource(null);
     setCitationNotice(null);
+    setInferenceError(null);
+    setCurrentStep(3);
     abortControllerRef.current = new AbortController();
 
     try {
@@ -263,21 +302,26 @@ export default function App() {
         onSourceChange: (type, modelName) => {
           setStorySource({ type, model: modelName });
         },
+        onError: (errMsg) => {
+          setInferenceError(errMsg);
+        },
         onToken: (fullText) => {
           setManifestationText(fullText);
+          setCurrentStep(4);
         },
       });
 
-      // Ectoplasmic confetti celebration
       confetti({
         particleCount: 45,
         spread: 60,
         origin: { y: 0.8 },
         colors: ['#00ff88', '#22d3ee', '#c084fc', '#ffffff'],
       });
+      setCurrentStep(4);
     } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.error('Séance error:', err);
+      if (err.name !== 'AbortError' && !abortControllerRef.current?.signal?.aborted) {
+        console.error('Investigation error:', err);
+        setInferenceError(err.message || 'Investigation failed');
       }
     } finally {
       setIsGenerating(false);
@@ -285,7 +329,7 @@ export default function App() {
     }
   };
 
-  const handleStopSéance = () => {
+  const handleStopInvestigation = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -346,71 +390,286 @@ ${tiers.narrative || manifestationText}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ghosttrace_dossier.md`;
+    a.download = `ghosttrace_${forensicData.filename.replace(/[^a-zA-Z0-9_-]/g, '_')}_dossier.md`;
     a.click();
     URL.revokeObjectURL(url);
+    setCurrentStep(5);
+  };
+
+  const handleToggleLayout = () => {
+    setLayoutMode((prev) => (prev === 'split' ? 'file-only' : prev === 'file-only' ? 'results-only' : 'split'));
   };
 
   return (
-    <div className={`min-h-screen flex flex-col ${isCrtOn ? 'crt-active crt-vignette' : ''}`}>
-      {/* Header with Navigation and Toggles */}
-      <Header
+    <div className={`min-h-screen flex flex-row bg-[#030608] text-slate-100 overflow-x-hidden ${isCrtOn ? 'crt-active crt-vignette' : ''}`}>
+      {/* Navigation Sidebar */}
+      <Sidebar
+        activeNav={activeNav}
+        onSelectNav={setActiveNav}
         ollamaStatus={ollamaStatus}
-        onRefreshOllama={checkOllama}
         selectedModel={selectedModel}
-        onSelectModel={setSelectedModel}
-        isAudioOn={isAudioOn}
-        onToggleAudio={handleToggleAudio}
-        isCrtOn={isCrtOn}
-        onToggleCrt={handleToggleCrt}
-      />
-
-      {/* Archeology Bar */}
-      <ArcheologyBar
-        currentArchiveId={currentArchiveId}
-        onSelectArchive={loadArchive}
-        onCustomFileUpload={handleCustomFileUpload}
-        onFolderAnalysis={handleFolderAnalysis}
-        onTerminalImport={handleTerminalImport}
-        onPasteSnippet={handlePasteSnippet}
-        isCustomFile={isCustomFile}
+        isGenerating={isGenerating}
         activeFilename={activeFilename}
+        terminalData={terminalData}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebarCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+        isMobileOpen={isMobileOpen}
+        onCloseMobile={() => setIsMobileOpen(false)}
       />
 
-      {/* Main Split Séance Interface */}
-      <main className="flex-1 p-3 sm:p-5 max-w-[1600px] w-full mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 h-auto lg:h-[calc(100vh-128px)] min-h-0 lg:min-h-[640px]">
-        {/* Left Pane: Evidence Crypt */}
-        {forensicData && (
-          <EvidencePanel
-            rawContent={rawContent}
-            forensics={forensicData}
-            redactions={redactedData}
-            highlightedLine={highlightedLine}
-            onLineClick={handleLineClick}
-            citationNotice={citationNotice}
-            onDismissNotice={() => setCitationNotice(null)}
-            terminalData={terminalData}
-            isTerminalMode={isTerminalMode}
-            memoryManifest={memoryManifest}
-          />
+      {/* Main App Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 w-full min-h-screen overflow-x-hidden">
+        {/* Top Header */}
+        <Header
+          activeNav={activeNav}
+          onOpenMobile={() => setIsMobileOpen(true)}
+          ollamaStatus={ollamaStatus}
+          onRefreshOllama={checkOllama}
+          selectedModel={selectedModel}
+          onSelectModel={setSelectedModel}
+          isAudioOn={isAudioOn}
+          onToggleAudio={handleToggleAudio}
+          isCrtOn={isCrtOn}
+          onToggleCrt={handleToggleCrt}
+          activeFilename={activeFilename}
+          isGenerating={isGenerating}
+          onStartInvestigation={handleStartInvestigation}
+          onStopInvestigation={handleStopInvestigation}
+          onSelectNav={setActiveNav}
+        />
+
+        {/* Global Error Banner */}
+        {uploadError && (
+          <div className="mx-4 mt-3 p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 flex items-center justify-between text-xs font-fira text-rose-300">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚠️</span>
+              <span>{uploadError}</span>
+            </div>
+            <button
+              onClick={() => setUploadError(null)}
+              className="text-rose-400 hover:text-white px-2 py-0.5 rounded text-xs font-bold cursor-pointer"
+            >
+              ✕ Dismiss
+            </button>
+          </div>
         )}
 
-        {/* Right Pane: Spectral Manifestation */}
-        <ManifestationPanel
-          selectedPersona={selectedPersona}
-          onSelectPersona={setSelectedPersona}
-          onStartSéance={handleStartSéance}
-          onStopSéance={handleStopSéance}
-          isGenerating={isGenerating}
-          manifestationText={manifestationText}
-          activeModel={selectedModel}
-          isOllamaOnline={ollamaStatus.online}
-          storySource={storySource}
-          onSelectCitation={handleSelectCitation}
-          onExportDossier={handleExportDossier}
-          forensicData={forensicData}
-        />
-      </main>
+        {/* Active View Container */}
+        <main className="flex-1 p-3 sm:p-5 overflow-y-auto">
+          {activeNav === 'dashboard' && (
+            <Dashboard
+              onSelectNav={setActiveNav}
+              onCustomFileUpload={handleCustomFileUpload}
+              onFolderAnalysis={handleFolderAnalysis}
+              onTerminalImport={handleTerminalImport}
+              onOpenPasteModal={() => setIsPasteModalOpen(true)}
+              onOpenPrivacyModal={() => setIsPrivacyModalOpen(true)}
+              onStartInvestigation={handleStartInvestigation}
+              onExportDossier={handleExportDossier}
+              currentArchiveId={currentArchiveId}
+              onSelectArchive={loadArchive}
+              activeFilename={activeFilename}
+              forensicData={forensicData}
+              redactedData={redactedData}
+              isCustomFile={isCustomFile}
+              ollamaStatus={ollamaStatus}
+              selectedModel={selectedModel}
+              isGenerating={isGenerating}
+              manifestationText={manifestationText}
+              currentStep={currentStep}
+              setCurrentStep={setCurrentStep}
+              setUploadError={setUploadError}
+            />
+          )}
+
+          {activeNav === 'memory' && (
+            <div className="h-[calc(100vh-100px)] min-h-[580px]">
+              {layoutMode === 'split' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+                  <EvidencePanel
+                    rawContent={rawContent}
+                    forensics={forensicData}
+                    redactions={redactedData}
+                    highlightedLine={highlightedLine}
+                    onLineClick={handleLineClick}
+                    citationNotice={citationNotice}
+                    onDismissNotice={() => setCitationNotice(null)}
+                    terminalData={terminalData}
+                    isTerminalMode={isTerminalMode}
+                    memoryManifest={memoryManifest}
+                    fontSize={fontSize}
+                    layoutMode={layoutMode}
+                    onToggleLayout={handleToggleLayout}
+                  />
+                  <ManifestationPanel
+                    selectedPersona={selectedPersona}
+                    onSelectPersona={setSelectedPersona}
+                    onStartSéance={handleStartInvestigation}
+                    onStopSéance={handleStopInvestigation}
+                    isGenerating={isGenerating}
+                    manifestationText={manifestationText}
+                    activeModel={selectedModel}
+                    isOllamaOnline={ollamaStatus.online}
+                    storySource={storySource}
+                    onSelectCitation={handleSelectCitation}
+                    onExportDossier={handleExportDossier}
+                    forensicData={forensicData}
+                    inferenceError={inferenceError}
+                    onRetryInvestigation={handleStartInvestigation}
+                    onDismissError={() => setInferenceError(null)}
+                    fontSize={fontSize}
+                    layoutMode={layoutMode}
+                    onToggleLayout={handleToggleLayout}
+                  />
+                </div>
+              ) : (
+                <EvidencePanel
+                  rawContent={rawContent}
+                  forensics={forensicData}
+                  redactions={redactedData}
+                  highlightedLine={highlightedLine}
+                  onLineClick={handleLineClick}
+                  citationNotice={citationNotice}
+                  onDismissNotice={() => setCitationNotice(null)}
+                  terminalData={terminalData}
+                  isTerminalMode={isTerminalMode}
+                  memoryManifest={memoryManifest}
+                  fontSize={fontSize}
+                  layoutMode={layoutMode}
+                  onToggleLayout={handleToggleLayout}
+                />
+              )}
+            </div>
+          )}
+
+          {activeNav === 'terminal' && (
+            <TerminalPanel
+              terminalData={terminalData}
+              rawContent={rawContent}
+              onImportTerminal={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.log,.txt,.json,.out,.err,.csv,.sh,.ps1,.bash_history';
+                input.onchange = (e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      if (typeof ev.target?.result === 'string') {
+                        handleTerminalImport(file.name, ev.target.result);
+                      }
+                    };
+                    reader.readAsText(file);
+                  }
+                };
+                input.click();
+              }}
+              onLoadSampleTerminal={() => loadArchive('terminal_incident')}
+              onLineClick={handleLineClick}
+              onSelectNav={setActiveNav}
+            />
+          )}
+
+          {activeNav === 'results' && (
+            <div className="h-[calc(100vh-100px)] min-h-[580px]">
+              {layoutMode === 'split' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
+                  <EvidencePanel
+                    rawContent={rawContent}
+                    forensics={forensicData}
+                    redactions={redactedData}
+                    highlightedLine={highlightedLine}
+                    onLineClick={handleLineClick}
+                    citationNotice={citationNotice}
+                    onDismissNotice={() => setCitationNotice(null)}
+                    terminalData={terminalData}
+                    isTerminalMode={isTerminalMode}
+                    memoryManifest={memoryManifest}
+                    fontSize={fontSize}
+                    layoutMode={layoutMode}
+                    onToggleLayout={handleToggleLayout}
+                  />
+                  <ManifestationPanel
+                    selectedPersona={selectedPersona}
+                    onSelectPersona={setSelectedPersona}
+                    onStartSéance={handleStartInvestigation}
+                    onStopSéance={handleStopInvestigation}
+                    isGenerating={isGenerating}
+                    manifestationText={manifestationText}
+                    activeModel={selectedModel}
+                    isOllamaOnline={ollamaStatus.online}
+                    storySource={storySource}
+                    onSelectCitation={handleSelectCitation}
+                    onExportDossier={handleExportDossier}
+                    forensicData={forensicData}
+                    inferenceError={inferenceError}
+                    onRetryInvestigation={handleStartInvestigation}
+                    onDismissError={() => setInferenceError(null)}
+                    fontSize={fontSize}
+                    layoutMode={layoutMode}
+                    onToggleLayout={handleToggleLayout}
+                  />
+                </div>
+              ) : (
+                <ManifestationPanel
+                  selectedPersona={selectedPersona}
+                  onSelectPersona={setSelectedPersona}
+                  onStartSéance={handleStartInvestigation}
+                  onStopSéance={handleStopInvestigation}
+                  isGenerating={isGenerating}
+                  manifestationText={manifestationText}
+                  activeModel={selectedModel}
+                  isOllamaOnline={ollamaStatus.online}
+                  storySource={storySource}
+                  onSelectCitation={handleSelectCitation}
+                  onExportDossier={handleExportDossier}
+                  forensicData={forensicData}
+                  inferenceError={inferenceError}
+                  onRetryInvestigation={handleStartInvestigation}
+                  onDismissError={() => setInferenceError(null)}
+                  fontSize={fontSize}
+                  layoutMode={layoutMode}
+                  onToggleLayout={handleToggleLayout}
+                />
+              )}
+            </div>
+          )}
+
+          {activeNav === 'settings' && (
+            <SettingsPanel
+              ollamaStatus={ollamaStatus}
+              onRefreshOllama={checkOllama}
+              selectedModel={selectedModel}
+              onSelectModel={setSelectedModel}
+              isAudioOn={isAudioOn}
+              onToggleAudio={handleToggleAudio}
+              isCrtOn={isCrtOn}
+              onToggleCrt={handleToggleCrt}
+              fontSize={fontSize}
+              onChangeFontSize={setFontSize}
+              redactedData={redactedData}
+            />
+          )}
+        </main>
+      </div>
+
+      {/* Privacy Redaction Review Modal (Workflow Step 2) */}
+      <PrivacyModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
+        redactedData={redactedData}
+        onProceedToInvestigation={() => {
+          setActiveNav('results');
+          handleStartInvestigation();
+        }}
+      />
+
+      {/* Paste Trace Modal */}
+      <PasteModal
+        isOpen={isPasteModalOpen}
+        onClose={() => setIsPasteModalOpen(false)}
+        onPasteSubmit={handlePasteSnippet}
+      />
     </div>
   );
 }

@@ -1,0 +1,13 @@
+# GHOSTTRACE TEST FIXTURE — inert text only. Never execute these lines.
+# Expected checks: repeated commands, risky-command flags, exit codes, redaction.
+$ export OPENAI_KEY="sk-test-FAKE000000000000000000000000"
+$ git status
+$ git status
+$ git status
+$ npm test
+$ echo "temporary test output"
+$ rm -rf /tmp/ghosttrace-demo
+$ git push --force origin test-branch
+$ psql "postgres://demo_user:FAKE_PASSWORD@localhost:5432/demo_db"
+$ echo "process exited with code 137"
+$ echo "simulated crash after memory pressure"

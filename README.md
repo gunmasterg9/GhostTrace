@@ -98,23 +98,29 @@ Visit **[http://localhost:5173/](http://localhost:5173/)** in your browser.
 GhostTrace/
 ├── src/
 │   ├── components/
-│   │   ├── Header.jsx             # Status, model selector, CRT and EVP audio toggles
-│   │   ├── ArcheologyBar.jsx      # Archive selector, file upload, folder scan, terminal import & paste
-│   │   ├── EvidencePanel.jsx      # The Digital Crypt: syntax, TODOs, panics, redactions, haunted terminal tab
-│   │   └── ManifestationPanel.jsx # The Séance Chamber: persona selector, story streaming & 3-tier epistemic display
+│   │   ├── Sidebar.jsx            # Main navigation sidebar: Dashboard, Memory, Terminal, Results, Settings
+│   │   ├── Header.jsx             # Top bar with section title, model status, CRT & Audio quick controls
+│   │   ├── Dashboard.jsx          # Primary actions (Explore Files, Import Terminal, Paste Trace) & 5-step stepper
+│   │   ├── EvidencePanel.jsx      # Source Code & Evidence Crypt: syntax, TODOs, panics, jump-to-line, resizable
+│   │   ├── ManifestationPanel.jsx # 3-Tier investigation results (Verified Facts, AI Deductions, Fiction)
+│   │   ├── TerminalPanel.jsx      # Dedicated terminal forensics screen with inert command safety guarantees
+│   │   ├── SettingsPanel.jsx      # Ollama configuration, CRT filter, EVP audio drone & reader font size
+│   │   ├── PrivacyModal.jsx       # Investigation Step 2: Client-side secret redaction audit
+│   │   ├── PasteModal.jsx         # In-memory code / backtrace paste modal
+│   │   └── Tooltip.jsx            # Plain English tooltips for technical forensics terms
 │   ├── data/
 │   │   ├── personas.js            # Spectral persona prompts and system instructions
-│   │   └── sampleArchives.js      # Curated artifacts (vault_cipher.rs, incident_0411.log, etc.)
+│   │   └── sampleArchives.js      # Curated artifacts (vault_cipher.rs, incident_0411.log, .bash_history)
 │   ├── utils/
-│   │   ├── audio.js               # Web Audio API ambient drone & keystroke synthesizer
+│   │   ├── audio.js               # Web Audio API ambient drone & chime synthesizer
 │   │   ├── forensics.js           # Archaeological parser for TODOs, panics, and timestamps
 │   │   ├── manifestationParser.js # 3-Tier epistemic parser & baseline ground truth formatter
 │   │   ├── memoryExplorer.js      # Bounded recursive multi-file parser & binary filter
 │   │   ├── ollama.js              # Ollama proxy client, token streamer & fallback simulator
 │   │   ├── redactor.js            # Client-side privacy shield redacting secrets, paths & keys
 │   │   └── terminalForensics.js   # Inert text-only terminal history & failure loop analyzer
-│   ├── App.jsx                    # Core application orchestrator & dossier exporter
-│   └── index.css                  # Cyber-gothic CRT design system
+│   ├── App.jsx                    # Core application orchestrator, navigation & dossier exporter
+│   └── index.css                  # Cyber-gothic accessible dark design system
 ├── tests/                         # Node.js native automated test suite (18 tests)
 │   ├── evidence_vs_imagination.test.js
 │   ├── haunted_terminal.test.js

@@ -1,15 +1,20 @@
 // Ollama & Gemma Integration Engine for GhostTrace AI
-import { spectralAudio } from './audio';
+import { spectralAudio } from './audio.js';
 
 // Vite proxies /ollama to http://127.0.0.1:11434
 const OLLAMA_PROXIED_BASE = '/ollama';
 const OLLAMA_DIRECT_BASE = 'http://localhost:11434';
 
-export async function checkOllamaStatus() {
-  const endpoints = [
+export async function checkOllamaStatus(customEndpoint) {
+  const endpoints = [];
+  if (customEndpoint && typeof customEndpoint === 'string' && customEndpoint.trim()) {
+    const clean = customEndpoint.trim().replace(/\/+$/, '');
+    endpoints.push(clean.endsWith('/api/tags') ? clean : `${clean}/api/tags`);
+  }
+  endpoints.push(
     `${OLLAMA_PROXIED_BASE}/api/tags`,
-    `${OLLAMA_DIRECT_BASE}/api/tags`,
-  ];
+    `${OLLAMA_DIRECT_BASE}/api/tags`
+  );
 
   for (const endpoint of endpoints) {
     try {
@@ -26,13 +31,14 @@ export async function checkOllamaStatus() {
         // Find best Gemma model or default to first
         const gemmaModel = models.find((m) => m.toLowerCase().includes('gemma'));
         const activeModel = gemmaModel || models[0] || 'gemma4:e4b';
+        const base = endpoint.replace(/\/api\/tags\/?$/, '');
 
         return {
           online: true,
           models,
           activeModel,
           isGemma: !!gemmaModel,
-          endpoint: endpoint.includes('11434') ? OLLAMA_DIRECT_BASE : OLLAMA_PROXIED_BASE,
+          endpoint: base,
         };
       }
     } catch {
@@ -57,7 +63,9 @@ export async function streamGhostStory({
   forensics,
   onToken,
   onSourceChange,
+  onError,
   signal,
+  timeoutMs = 30000,
 }) {
   const systemPrompt = persona.systemInstruction;
   
@@ -113,6 +121,26 @@ End the fictional section with a haunting digital epitaph.
 If a section has no supporting material, say so instead of inventing evidence.
 `.trim();
 
+  const fetchController = new AbortController();
+  let timeoutId = null;
+
+  const onExternalAbort = () => {
+    fetchController.abort(signal?.reason || new Error('Aborted by user'));
+  };
+
+  if (signal) {
+    if (signal.aborted) {
+      throw signal.reason || new Error('Aborted by user');
+    }
+    signal.addEventListener('abort', onExternalAbort, { once: true });
+  }
+
+  if (timeoutMs > 0) {
+    timeoutId = setTimeout(() => {
+      fetchController.abort(new Error(`Ollama request timed out after ${Math.round(timeoutMs / 1000)}s`));
+    }, timeoutMs);
+  }
+
   try {
     const res = await fetch(`${endpoint || OLLAMA_PROXIED_BASE}/api/generate`, {
       method: 'POST',
@@ -127,11 +155,20 @@ If a section has no supporting material, say so instead of inventing evidence.
           top_p: 0.9,
         },
       }),
-      signal,
+      signal: fetchController.signal,
     });
 
     if (!res.ok) {
-      throw new Error(`Ollama returned status ${res.status}`);
+      let errorDetail = `Ollama returned status ${res.status}`;
+      try {
+        const errorJson = await res.json();
+        if (errorJson?.error) {
+          errorDetail = `Ollama error: ${errorJson.error}`;
+        }
+      } catch {
+        // ignore non-json error responses
+      }
+      throw new Error(errorDetail);
     }
 
     onSourceChange?.('ollama', model);
@@ -151,6 +188,9 @@ If a section has no supporting material, say so instead of inventing evidence.
       for (const line of lines) {
         try {
           const parsed = JSON.parse(line);
+          if (parsed.error) {
+            throw new Error(`Ollama stream error: ${parsed.error}`);
+          }
           if (parsed.response) {
             accumulated += parsed.response;
             onToken(accumulated, parsed.response);
@@ -159,23 +199,47 @@ If a section has no supporting material, say so instead of inventing evidence.
               spectralAudio.playKeyClick();
             }
           }
-        } catch {
-          // ignore stream parse errors
+        } catch (streamErr) {
+          if (streamErr?.message && streamErr.message.startsWith('Ollama stream error:')) {
+            throw streamErr;
+          }
+          // ignore partial json chunk parsing errors
         }
       }
+    }
+
+    if (!accumulated.trim()) {
+      throw new Error('Ollama response stream was empty');
     }
 
     return accumulated;
   } catch (err) {
     if (signal?.aborted) throw err;
-    console.warn('Ollama streaming failed, falling back to spectral simulation engine:', err);
+    const errorMessage = err?.message || 'Ollama connection or inference failed';
+    console.warn('Ollama streaming failed, falling back to spectral simulation engine:', errorMessage);
+    onError?.(errorMessage);
     onSourceChange?.('simulation', 'Simulation Engine');
-    return simulateGhostStream({ persona, forensics, onToken, signal });
+    return simulateGhostStream({
+      persona,
+      forensics,
+      onToken,
+      signal,
+      skipDelay: (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test'),
+    });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (signal) signal.removeEventListener('abort', onExternalAbort);
   }
 }
 
 // Atmospheric Client-Side Fallback Simulator (grounded in real code evidence)
-export async function simulateGhostStream({ persona, forensics, onToken, signal }) {
+export async function simulateGhostStream({
+  persona,
+  forensics,
+  onToken,
+  signal,
+  skipDelay = (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test'),
+}) {
   const fileName = forensics.filename || 'the abandoned script';
   const topMarker = forensics.markers[0] || null;
   const topPanic = forensics.panics[0] || null;
@@ -232,6 +296,7 @@ export async function simulateGhostStream({ persona, forensics, onToken, signal 
   let fullText = '';
 
   for (let pIdx = 0; pIdx < outputLines.length; pIdx++) {
+    if (signal?.aborted) return fullText;
     const paragraph = outputLines[pIdx];
     if (!paragraph) {
       fullText += '\n';
@@ -247,11 +312,15 @@ export async function simulateGhostStream({ persona, forensics, onToken, signal 
       onToken(fullText, word);
       spectralAudio.playKeyClick();
       // Organic typing cadence delay
-      await new Promise((r) => setTimeout(r, 28 + Math.random() * 25));
+      if (!skipDelay) {
+        await new Promise((r) => setTimeout(r, 28 + Math.random() * 25));
+      }
     }
     fullText += '\n\n';
     onToken(fullText, '\n\n');
-    await new Promise((r) => setTimeout(r, 200));
+    if (!skipDelay) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
   }
 
   return fullText;

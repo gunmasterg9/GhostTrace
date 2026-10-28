@@ -1,7 +1,19 @@
 import React from 'react';
-import { Ghost, Volume2, VolumeX, Monitor, ShieldCheck, Cpu, RefreshCw } from 'lucide-react';
+import {
+  Menu,
+  Volume2,
+  VolumeX,
+  Monitor,
+  Cpu,
+  RefreshCw,
+  Radio,
+  StopCircle,
+  FileCode,
+} from 'lucide-react';
 
 export function Header({
+  activeNav,
+  onOpenMobile,
   ollamaStatus,
   onRefreshOllama,
   selectedModel,
@@ -10,41 +22,60 @@ export function Header({
   onToggleAudio,
   isCrtOn,
   onToggleCrt,
+  activeFilename,
+  isGenerating,
+  onStartInvestigation,
+  onStopInvestigation,
+  onSelectNav,
 }) {
+  const sectionTitles = {
+    dashboard: 'Dashboard',
+    memory: 'Memory Explorer',
+    terminal: 'Terminal Forensics',
+    results: 'Investigation Results',
+    settings: 'Settings & Privacy',
+  };
+
   return (
-    <header className="border-b border-cyan-900/30 bg-[#060b10]/80 backdrop-blur-md sticky top-0 z-40 px-4 py-3">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-        {/* Brand */}
+    <header className="border-b border-cyan-900/30 bg-[#060a0f]/90 backdrop-blur-md sticky top-0 z-30 px-3 sm:px-6 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        {/* Left: Mobile Toggle + Title */}
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(0,255,136,0.3)] animate-ghost-pulse">
-            <Ghost className="w-6 h-6" />
-          </div>
+          <button
+            onClick={onOpenMobile}
+            className="lg:hidden p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-cyan-950/40 border border-slate-800 focus-visible:ring-2 focus-visible:ring-cyan-400"
+            aria-label="Open Navigation Menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-cinzel text-xl font-bold tracking-wider text-slate-100 flex items-center gap-2">
-                GhostTrace <span className="text-emerald-400 font-orbitron text-xs px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-950/40">AI</span>
-              </h1>
-              <span className="hidden sm:inline-block text-[11px] font-fira text-cyan-400/70 border-l border-cyan-800/40 pl-2">
-                The Ghost That Remembers
-              </span>
+              <h2 className="font-cinzel text-base sm:text-lg font-bold tracking-wide text-slate-100 flex items-center gap-2">
+                {sectionTitles[activeNav] || 'GhostTrace AI'}
+              </h2>
+              {activeFilename && (
+                <button
+                  onClick={() => onSelectNav('memory')}
+                  className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#0e1622] hover:bg-[#162334] border border-cyan-900/50 text-cyan-300 text-xs font-fira transition-colors cursor-pointer"
+                  title="Click to view file in Memory Explorer"
+                >
+                  <FileCode className="w-3 h-3 text-cyan-400" />
+                  <span className="truncate max-w-[180px]">{activeFilename}</span>
+                </button>
+              )}
             </div>
-            <p className="text-xs text-slate-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping inline-block"></span>
-              Digital archaeology & cyber-gothic local forensics
+            <p className="hidden sm:flex items-center gap-1.5 text-[11px] font-fira text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+              <span>Local-First Forensics • Zero Cloud Ingestion</span>
             </p>
           </div>
         </div>
 
-        {/* Center / Right controls */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-fira">
-          {/* Privacy Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-950/30 border border-emerald-500/20 text-emerald-300/90" title="Selected files stay entirely on your local machine">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Local Inference • 0 Cloud Uploads</span>
-          </div>
-
-          {/* Ollama Status & Model Picker */}
-          <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-[#0e1620] border border-cyan-900/40">
+        {/* Right: Quick Controls & Actions */}
+        <div className="flex items-center gap-2 sm:gap-3 text-xs font-fira">
+          {/* Ollama Status Pill & Model Selector */}
+          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#0a111a] border border-cyan-900/40">
             <Cpu className="w-3.5 h-3.5 text-cyan-400" />
             <div className="flex items-center gap-1.5">
               <span
@@ -52,8 +83,8 @@ export function Header({
                   ollamaStatus.online ? 'bg-emerald-400 shadow-[0_0_8px_#00ff88]' : 'bg-amber-400'
                 }`}
               />
-              <span className="text-slate-300 font-medium">
-                {ollamaStatus.online ? 'Ollama Online' : 'Simulation Mode'}
+              <span className="text-slate-300 font-medium hidden md:inline">
+                {ollamaStatus.online ? 'Ollama' : 'Simulation'}
               </span>
             </div>
 
@@ -61,7 +92,8 @@ export function Header({
               <select
                 value={selectedModel}
                 onChange={(e) => onSelectModel(e.target.value)}
-                className="bg-[#080d14] text-cyan-300 border border-cyan-900/60 rounded px-2 py-0.5 text-xs outline-none focus:border-cyan-400 cursor-pointer"
+                className="bg-[#05080c] text-cyan-300 border border-cyan-900/60 rounded px-2 py-0.5 text-xs outline-none focus-visible:ring-1 focus-visible:ring-cyan-400 cursor-pointer max-w-[130px] truncate"
+                aria-label="Select Ollama Model"
               >
                 {ollamaStatus.models.map((m) => (
                   <option key={m} value={m}>
@@ -73,40 +105,70 @@ export function Header({
 
             <button
               onClick={onRefreshOllama}
-              title="Re-check local Ollama service"
-              className="p-1 hover:text-cyan-300 text-slate-400 transition-colors"
+              title="Refresh local Ollama status"
+              className="p-1 hover:text-cyan-300 text-slate-400 transition-colors focus-visible:ring-1 focus-visible:ring-cyan-400 rounded"
+              aria-label="Refresh Ollama status"
             >
               <RefreshCw className="w-3 h-3" />
             </button>
           </div>
 
-          {/* CRT Toggle */}
+          {/* CRT Mode Toggle */}
           <button
             onClick={onToggleCrt}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-md border transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none ${
               isCrtOn
                 ? 'bg-cyan-950/60 border-cyan-400/50 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.2)]'
-                : 'bg-[#0e1620] border-slate-800 text-slate-400 hover:text-slate-200'
+                : 'bg-[#0a111a] border-slate-800 text-slate-400 hover:text-slate-200'
             }`}
             title="Toggle Retro CRT Scanlines & Phosphor Glow"
+            aria-pressed={isCrtOn}
           >
             <Monitor className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">CRT Mode</span>
+            <span className="hidden md:inline">CRT Mode</span>
           </button>
 
-          {/* Audio Synthesizer Toggle */}
+          {/* EVP Audio Drone Toggle */}
           <button
             onClick={onToggleAudio}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-md border transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:outline-none ${
               isAudioOn
                 ? 'bg-purple-950/60 border-purple-400/50 text-purple-300 shadow-[0_0_10px_rgba(192,132,252,0.2)]'
-                : 'bg-[#0e1620] border-slate-800 text-slate-400 hover:text-slate-200'
+                : 'bg-[#0a111a] border-slate-800 text-slate-400 hover:text-slate-200'
             }`}
-            title="Toggle Ambient Spectral EVP Audio Generator"
+            title="Toggle Ambient Audio Drone"
+            aria-pressed={isAudioOn}
           >
-            {isAudioOn ? <Volume2 className="w-3.5 h-3.5 text-purple-400 animate-pulse" /> : <VolumeX className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">EVP Drone</span>
+            {isAudioOn ? (
+              <Volume2 className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+            ) : (
+              <VolumeX className="w-3.5 h-3.5" />
+            )}
+            <span className="hidden md:inline">Ambient Audio</span>
           </button>
+
+          {/* Primary Investigation Action Button */}
+          {isGenerating ? (
+            <button
+              onClick={onStopInvestigation}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-fira font-semibold bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/50 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-400"
+            >
+              <StopCircle className="w-3.5 h-3.5" />
+              <span>Halt</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                onSelectNav('results');
+                onStartInvestigation();
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-fira font-bold bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-black shadow-[0_0_15px_rgba(0,255,136,0.3)] transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400"
+              title="Launch AI investigation on the active artifact"
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span>Investigate</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

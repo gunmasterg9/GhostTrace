@@ -169,5 +169,11 @@ Verifies all **36 test cases** across the core pillars:
 
 ---
 
+## 📋 Release Notes & Changelog
+
+See [`CHANGELOG.md`](file:///c:/Users/RAHUL/Desktop/gautam/GhostTrace/CHANGELOG.md) for the complete list of additions, fixes, security enhancements, and validation metrics for `v1.0.0-rc.1` in English and Gujarati (ગુજરાતી સારાંશ).
+
+---
+
 ## 📜 License
 MIT — Run it locally, preserve your digital history, and let the machine remember.

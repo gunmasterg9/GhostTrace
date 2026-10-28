@@ -108,7 +108,7 @@ GhostTrace/
 │   │   ├── Dashboard.jsx          # Primary actions (Explore Files, Import Terminal, Paste Trace) & 5-step stepper
 │   │   ├── EvidencePanel.jsx      # Source Code & Evidence Crypt: syntax, TODOs, panics, jump-to-line, resizable
 │   │   ├── ManifestationPanel.jsx # 3-Tier investigation results (Verified Facts, AI Deductions, Fiction)
-│   │   ├── TerminalPanel.jsx      # Dedicated terminal forensics screen with inert command safety guarantees
+│   │   ├── TerminalPanel.jsx      # Dedicated terminal forensics screen with inert command parsing safety
 │   │   ├── SettingsPanel.jsx      # Ollama configuration, CRT filter, EVP audio drone & reader font size
 │   │   ├── PrivacyModal.jsx       # Investigation Step 2: Client-side secret redaction audit
 │   │   ├── PasteModal.jsx         # In-memory code / backtrace paste modal
@@ -143,7 +143,7 @@ GhostTrace/
 
 GhostTrace includes a complete native automated test suite with zero extra test-runner dependencies:
 
-```bash
+```powershell
 # On Windows PowerShell:
 npm.cmd test
 npm.cmd run lint
@@ -171,7 +171,7 @@ Verifies all **36 test cases** across the core pillars:
 
 ## 📋 Release Notes & Changelog
 
-See [`CHANGELOG.md`](file:///c:/Users/RAHUL/Desktop/gautam/GhostTrace/CHANGELOG.md) for the complete list of additions, fixes, security enhancements, and validation metrics for `v1.0.0-rc.1` in English and Gujarati (ગુજરાતી સારાંશ).
+See [`CHANGELOG.md`](file:///c:/Users/RAHUL/Desktop/gautam/GhostTrace/CHANGELOG.md) for the complete list of additions, fixes, security enhancements, and validation metrics for `v1.0.0` in English and Gujarati (ગુજરાતી સારાંશ).
 
 ---
 

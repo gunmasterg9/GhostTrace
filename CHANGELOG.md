@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 36 passed automated unit and regression tests with 0 failures.
 - 0 lint warnings and 0 errors across 29 source files (104 oxlint rules).
 - 0 package vulnerabilities reported via `npm audit`.
-- Live local Ollama streaming verified with `qwen3:1.7b` (454 tokens) and `gemma4:e4b` fallback handling.
+- Live local Ollama testing: confirmed continuous streaming with `qwen3:1.7b` (454 tokens) and 60s inactivity timeout fallback with cold-loading `gemma4:e4b`.
 - Production build verified in Windows environment.
 
 ## [1.0.0-rc.1] — 2026-10-28 (Release Candidate)

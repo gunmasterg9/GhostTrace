@@ -1,4 +1,4 @@
-# 👻 GhostTrace AI: The Ghost That Remembers (Release Candidate v1.0.0-rc.1)
+# 👻 GhostTrace AI: The Ghost That Remembers (v1.0.0 Stable Release)
 
 > *"The machine remembers. Now it has a story to tell."*
 

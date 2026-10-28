@@ -5,6 +5,21 @@ All notable changes to GhostTrace AI are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-10-28 (Stable Release)
+
+### Added
+- Official first stable release of GhostTrace AI.
+- Standalone comprehensive release notes in `RELEASE_NOTES_v1.0.0.md`.
+- HTML form accessibility attributes (`id`, `name`, `htmlFor`, `aria-label`) across all input, textarea, and select controls.
+- Complete Windows installation, 1-click execution (`start.bat`), and test suite validation.
+
+### Validated
+- 36 passed automated unit and regression tests with 0 failures.
+- 0 lint warnings and 0 errors across 29 source files (104 oxlint rules).
+- 0 package vulnerabilities reported via `npm audit`.
+- Live local Ollama streaming verified with `qwen3:1.7b` (454 tokens) and `gemma4:e4b` fallback handling.
+- Production build verified in Windows environment.
+
 ## [1.0.0-rc.1] — 2026-10-28 (Release Candidate)
 
 ### Added

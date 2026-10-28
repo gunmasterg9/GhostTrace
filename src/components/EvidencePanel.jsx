@@ -292,6 +292,9 @@ export function EvidencePanel({
           <form onSubmit={handleJumpToLine} className="flex items-center gap-1">
             <input
               type="number"
+              id="jump-to-line-input"
+              name="jumpToLine"
+              aria-label="Line Number"
               min="1"
               max={lines.length}
               value={searchLine}

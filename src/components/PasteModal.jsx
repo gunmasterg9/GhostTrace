@@ -63,10 +63,12 @@ export function PasteModal({ isOpen, onClose, onPasteSubmit }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-fira text-slate-300 mb-1.5 font-medium">
+            <label htmlFor="artifact-filename-input" className="block text-xs font-fira text-slate-300 mb-1.5 font-medium">
               Artifact Filename or Identifier:
             </label>
             <input
+              id="artifact-filename-input"
+              name="artifactFilename"
               type="text"
               value={filename}
               onChange={(e) => setFilename(e.target.value)}
@@ -76,10 +78,12 @@ export function PasteModal({ isOpen, onClose, onPasteSubmit }) {
           </div>
 
           <div>
-            <label className="block text-xs font-fira text-slate-300 mb-1.5 font-medium">
+            <label htmlFor="artifact-content-textarea" className="block text-xs font-fira text-slate-300 mb-1.5 font-medium">
               Source Code, Terminal Output, or Panic Backtrace:
             </label>
             <textarea
+              id="artifact-content-textarea"
+              name="artifactContent"
               rows={11}
               value={content}
               onChange={(e) => setContent(e.target.value)}

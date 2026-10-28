@@ -257,6 +257,8 @@ export function Dashboard({
       {/* Hidden file inputs */}
       <input
         type="file"
+        id="single-file-upload-input"
+        name="singleFile"
         ref={fileInputRef}
         onChange={handleSingleFileChange}
         accept=".rs,.js,.jsx,.ts,.tsx,.py,.go,.cpp,.c,.java,.log,.txt,.json,.md,.sh,.env,.yml,.yaml,.sql"
@@ -265,6 +267,8 @@ export function Dashboard({
       />
       <input
         type="file"
+        id="folder-upload-input"
+        name="projectFolder"
         ref={folderInputRef}
         onChange={handleFolderChange}
         webkitdirectory=""
@@ -275,6 +279,8 @@ export function Dashboard({
       />
       <input
         type="file"
+        id="terminal-history-upload-input"
+        name="terminalHistory"
         ref={terminalInputRef}
         onChange={handleTerminalHistoryChange}
         accept=".log,.txt,.json,.out,.err,.csv,.sh,.ps1,.bash_history"
